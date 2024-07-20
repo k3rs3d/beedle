@@ -1,0 +1,25 @@
+{% extends "admin/base_admin.html" %}
+
+{% block content %}
+    <h1>Product List</h1>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Price</th>
+            <th>Inventory</th>
+        </tr>
+        {% for product in products %}
+        <tr>
+            <td>{{ product.id }}</td>
+            <td>{{ product.name }}</td>
+            <td>{{ product.price }}</td>
+            <td>{{ product.inventory }}</td>
+			<td><form action="/admin/delete/{{ product.id }}" method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete {{ product.name }}?');">
+                    <button type="submit">Delete</button>
+                </form></td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/admin/add_product">New Product</a>
+{% endblock %}

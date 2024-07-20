@@ -1,0 +1,17 @@
+{% extends "admin/base_admin.html" %}
+
+{% block content %}
+    <h1>Add Product</h1>
+    <form action="/admin/add" method="post">
+		<label for="id">ID:</label>
+		<input type="number" id="id" name="id" required>
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" required><br>
+        <label for="price">Price:</label>
+        <input type="number" id="price" name="price" step="0.01" required><br>
+        <label for="inventory">Inventory:</label>
+        <input type="number" id="inventory" name="inventory" required><br>
+        <input type="submit" value="Add Product">
+    </form>
+    <a href="/admin/products">Back to product list</a>
+{% endblock %}

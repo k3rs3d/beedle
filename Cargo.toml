@@ -1,0 +1,29 @@
+[package]
+name = "beedle"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-files = "0.6.6"
+actix-rt = "2.10.0"
+actix-service = "2.0.2"
+actix-session = { version = "0.9.0", features = ["cookie-session"]}
+actix-web = "4.8.0"
+async-std = "1.12.0"
+chrono = "0.4.38"
+dotenv = "0.15.0"
+env_logger = "0.11.3"
+futures = "0.3.30"
+lettre = "0.11.7"
+log = "0.4.22"
+r2d2 = "0.8.10"
+r2d2_sqlite = "0.24.0"
+reqwest = "0.12.5"
+rusqlite = { version = "0.31.0", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.120"
+tera = "1.20.0"
+thiserror = "1.0.62"
+uuid = "1.10.0"

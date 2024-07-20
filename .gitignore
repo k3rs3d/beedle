@@ -1,0 +1,17 @@
+/target
+
+# Backup files created by editors
+*~
+*.swp
+
+# IDE files
+.idea/
+.vscode/
+.vs/
+
+# Database files
+*.db
+
+*.txt
+*.log
+*.backup
