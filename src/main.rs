@@ -12,7 +12,6 @@ mod errors;
 mod models;
 mod pay;
 mod routes;
-mod schema;
 mod session;
 
 use errors::BeedleError;
@@ -44,6 +43,10 @@ async fn main() -> Result<(), BeedleError> {
     let pool = crate::db::establish_connection().expect("Failed to create pool.");
     // Initialize database
     crate::db::init_db(&pool).expect("Failed to initialize database.");
+
+    // DEBUG - seed example products
+    let mut conn = pool.get().unwrap();
+    crate::db::seed_example_products(&mut conn).expect("Failed to seed products.");
 
     HttpServer::new(move || {
         App::new()

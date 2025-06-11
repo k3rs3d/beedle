@@ -7,6 +7,32 @@ use rusqlite::params;
 pub type DbPool = Pool<SqliteConnectionManager>;
 type Conn = PooledConnection<SqliteConnectionManager>;
 
+// DEBUG
+// Add fake example products to db
+pub fn seed_example_products(conn: &mut Conn) -> Result<(), BeedleError> {
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM product", [], |row| row.get(0))
+    .unwrap_or(0);
+    if count > 0 {
+        log::info!("Products already exist, skipping seed.");
+        return Ok(());
+    }
+
+    let example_products = vec![
+        Product { id: None, name: "Red Apple".to_string(), price: 1.50, inventory: 100 },
+        Product { id: None, name: "Blueberry Muffin".to_string(), price: 2.50, inventory: 40 },
+        Product { id: None, name: "Coffee".to_string(), price: 3.00, inventory: 30 },
+        Product { id: None, name: "Orange Juice".to_string(), price: 2.80, inventory: 25 },
+    ];
+
+    for p in example_products {
+        save_product(conn, &p)?;
+    }
+    log::info!("Seeded example products.");
+    Ok(())
+}
+
+
+
 pub fn establish_connection() -> Result<DbPool, BeedleError> {
     let manager = SqliteConnectionManager::file("inventory.db");
     Pool::builder().build(manager).map_err(|e| {
@@ -37,6 +63,25 @@ pub fn load_products(conn: &Conn) -> Result<Vec<Product>, BeedleError> {
             name: row.get(1)?,
             price: row.get(2)?,
             inventory: row.get(3)?,
+        })
+    })?;
+    let mut products = Vec::new();
+    for product in product_iter {
+        products.push(product?);
+    }
+    Ok(products)
+}
+
+// only load a limited subset,
+// to be used later for filtering products
+pub fn load_products_limited(conn: &Conn, limit: usize, offset: usize) -> Result<Vec<Product>, BeedleError> {
+    let mut stmt = conn.prepare("SELECT id, name, price, inventory FROM product LIMIT ? OFFSET ?")?;
+    let product_iter = stmt.query_map(params![limit as i64, offset as i64], |row| {
+        Ok(Product {
+            id: row.get(0)?,
+           name: row.get(1)?,
+           price: row.get(2)?,
+           inventory: row.get(3)?,
         })
     })?;
     let mut products = Vec::new();
