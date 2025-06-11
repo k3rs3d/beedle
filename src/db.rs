@@ -55,6 +55,14 @@ pub fn init_db(pool: &DbPool) -> Result<(), BeedleError> {
     Ok(())
 }
 
+// Total product count
+pub fn count_products(conn: &Conn) -> Result<usize, BeedleError> {
+    let count: usize = conn.query_row(
+    "SELECT COUNT(*) FROM product", [], |row| row.get(0)
+    )?;
+    Ok(count)
+}
+
 pub fn load_products(conn: &Conn) -> Result<Vec<Product>, BeedleError> {
     let mut stmt = conn.prepare("SELECT id, name, price, inventory FROM product")?;
     let product_iter = stmt.query_map([], |row| {

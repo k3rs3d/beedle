@@ -1,21 +1,35 @@
 use actix_web::{web, HttpResponse};
 use tera::{Tera, Context};
 use crate::config::Config;
-use crate::db::{DbPool, load_products};
+use crate::db::{DbPool, load_products_limited};
 use crate::errors::BeedleError;
+
+#[derive(serde::Deserialize)]
+struct ListParams {
+    page: Option<usize>,
+}
 
 async fn browse_products(
     pool: web::Data<DbPool>,
     tera: web::Data<Tera>,
     config: web::Data<Config>,
+    query: web::Query<ListParams>
 ) -> Result<HttpResponse, BeedleError> {
+    let page = query.page.unwrap_or(1); // /products?page=N
+    let per_page = 2;
+    let offset = (page - 1) * per_page;
+
     let conn = pool.get()?;
-    let products = load_products(&conn)?;
+    let total_products = crate::db::count_products(&conn)?;
+    let total_pages = (total_products as f64 / per_page as f64).ceil() as usize;
+    let products = crate::db::load_products_limited(&conn, per_page, offset)?;
    
     let mut ctx = Context::new();
     ctx.insert("products", &products);
     ctx.insert("site_name", &config.site_name);
     ctx.insert("root_domain", &config.root_domain);
+    ctx.insert("current_page", &page);
+    ctx.insert("total_pages", &total_pages);
    
     let rendered = tera.render("products.html", &ctx)?;
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))

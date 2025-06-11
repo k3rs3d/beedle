@@ -14,4 +14,29 @@
     </li>
 {% endfor %}
 </ul>
+
+
+
+{% if total_pages > 1 %}
+<center>
+<nav class="pagination">
+  {% if current_page > 1 %}
+    <a href="/products?page={{ current_page - 1 }}">Previous</a>
+  {% endif %}
+
+  {% for page_num in range(start=1, end=total_pages + 1) %}
+    {% if page_num == current_page %}
+      <span class="current">{{ page_num }}</span>
+    {% else %}
+      <a href="/products?page={{ page_num }}">{{ page_num }}</a>
+    {% endif %}
+  {% endfor %}
+
+  {% if current_page < total_pages %}
+    <a href="/products?page={{ current_page + 1 }}">Next</a>
+  {% endif %}
+</nav>
+</center>
+{% endif %}
+<hr>
 {% endblock %}
