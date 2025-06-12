@@ -8,6 +8,7 @@ use actix_web::web;
 pub fn init(cfg: &mut web::ServiceConfig) {
     admin::init(cfg);
     products::init(cfg);
+    //cfg.service(web::resource("/products").route(web::get().to(browse_products)));
     cart::init(cfg);
     checkout::init(cfg);
 }

@@ -3,7 +3,23 @@ use crate::db::{delete_product, load_products, save_product, DbPool};
 use crate::errors::BeedleError;
 use crate::models::Product;
 use actix_web::{web, HttpResponse};
+use serde::{Serialize, Deserialize};
 use tera::Tera;
+
+#[derive(Debug, Deserialize)]
+pub struct ProductForm {
+    pub name: String,
+    pub price: f64,
+    pub inventory: u32,
+
+    pub category: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub thumbnail_url: Option<String>,
+    pub gallery_urls: Option<Vec<String>>,
+    pub tagline: Option<String>,
+    pub description: Option<String>,
+    pub discount_percent: Option<f64>,
+}
 
 async fn list_products(
     pool: web::Data<DbPool>,
@@ -34,16 +50,24 @@ async fn add_product_form(
 
 async fn add_product(
     pool: web::Data<DbPool>,
-    form: web::Form<Product>,
+    form: web::Form<ProductForm>,
 ) -> Result<HttpResponse, BeedleError> {
     log::info!("Received add product form data: {:?}", form);
     let mut conn = pool.get()?;
 
     let new_product = Product {
-        id: None, // Ensure new product has no id
+        id: None,
         name: form.name.clone(),
         price: form.price,
         inventory: form.inventory,
+        category: form.category.clone().unwrap_or_else(|| "Uncategorized".to_string()),
+        tags: form.tags.clone().unwrap_or_default(),
+        keywords: vec![],
+        thumbnail_url: form.thumbnail_url.clone(),
+        gallery_urls: form.gallery_urls.clone().unwrap_or_default(),
+        tagline: form.tagline.clone().unwrap_or_default(),
+        description: form.description.clone(),
+        discount_percent: form.discount_percent,
     };
 
     if let Err(e) = save_product(&mut conn, &new_product) {

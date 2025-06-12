@@ -1,17 +1,29 @@
 {% extends "admin/base_admin.html" %}
 
 {% block content %}
-    <h1>Add Product</h1>
-    <form action="/admin/add" method="post">
-		<label for="id">ID:</label>
-		<input type="number" id="id" name="id" required>
-        <label for="name">Name:</label>
+<h1>Add Product</h1>
+<form action="/admin/add" method="post">
+    <label for="name">Name:</label>
         <input type="text" id="name" name="name" required><br>
-        <label for="price">Price:</label>
+    <label for="price">Price:</label>
         <input type="number" id="price" name="price" step="0.01" required><br>
-        <label for="inventory">Inventory:</label>
+    <label for="inventory">Inventory:</label>
         <input type="number" id="inventory" name="inventory" required><br>
+    <label for="category">Category:</label>
+        <input type="text" id="category" name="category" value="Uncategorized"><br>
+    <label for="tags">Tags (comma separated):</label>
+        <input type="text" id="tags" name="tags"><br>
+    <label for="thumbnail_url">Thumbnail URL:</label>
+        <input type="text" id="thumbnail_url" name="thumbnail_url"><br>
+    <label for="gallery_urls">Gallery URLs (comma separated, up to 3):</label>
+        <input type="text" id="gallery_urls" name="gallery_urls"><br>
+    <label for="tagline">Tagline:</label>
+        <input type="text" id="tagline" name="tagline"><br>
+    <label for="description">Description:</label>
+        <textarea id="description" name="description"></textarea><br>
+    <label for="discount_percent">Discount (%):</label>
+        <input type="number" id="discount_percent" name="discount_percent" min="0" max="100" step="0.1"><br>
         <input type="submit" value="Add Product">
-    </form>
+</form>
     <a href="/admin/products">Back to product list</a>
 {% endblock %}

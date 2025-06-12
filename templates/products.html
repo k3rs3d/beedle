@@ -2,20 +2,56 @@
 
 {% block content %}
 <h1>Products</h1>
-<ul>
+<ul class="product-list">
 {% for product in products %}
-    <li>
+    <li class="product-card">
+        {% if product.thumbnail_url %}
+            <img src="{{ product.thumbnail_url }}" alt="{{ product.name }} thumbnail" class="product-thumb" style="max-width:100px;max-height:100px;">
+        {% endif %}
         <h3>{{ product.name }}</h3>
-        <p>Price: {{ product.price }}</p>
+        <p class="tagline">{{ product.tagline }}</p>
+        <p>
+            <b>Category:</b> {{ product.category }}
+            {% if product.tags and product.tags | length > 0 %}
+            <br><b>Tags:</b>
+                {% for tag in product.tags %}
+                    <span class="tag">{{ tag }}</span>{% if not loop.last %}, {% endif %}
+                {% endfor %}
+            {% endif %}
+        </p>
+        <p>
+            <b>Price:</b>
+            {% if product.discount_percent and product.discount_percent > 0 %}
+                {% set discount = product.price * (1.0 - product.discount_percent / 100.0) %}
+                <span class="discounted">
+                    <s>${{ product.price }}</s>
+                    ${{ discount | round(precision=2) }}
+                    <span class="discount-label">-{{ product.discount_percent | round(precision=2) }}%!</span>
+                </span>
+            {% else %}
+                ${{ product.price }}
+            {% endif %}
+        </p>
         <p>Inventory: {{ product.inventory }}</p>
+        {% if product.gallery_urls and product.gallery_urls | length > 0 %}
+            <div class="gallery-previews">
+                {% for img in product.gallery_urls %}
+                    <img src="{{ img }}" alt="Gallery photo" class="gallery-thumb" style="max-width:60px;max-height:60px;">
+                {% endfor %}
+            </div>
+        {% endif %}
         <form action="/add_to_cart/{{ product.id }}" method="post">
             <button type="submit">Add to Cart</button>
         </form>
+        {% if product.description %}
+            <details>
+                <summary>More info</summary>
+                <div class="description">{{ product.description }}</div>
+            </details>
+        {% endif %}
     </li>
 {% endfor %}
 </ul>
-
-
 
 {% if total_pages > 1 %}
 <center>

@@ -3,10 +3,15 @@ use tera::{Tera, Context};
 use crate::config::Config;
 use crate::db::{DbPool, load_products_limited};
 use crate::errors::BeedleError;
+use serde::{Serialize, Deserialize};
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct ListParams {
     page: Option<usize>,
+    category: Option<String>,
+    tag: Option<String>,
+    search: Option<String>,
+    sort: Option<String>,
 }
 
 async fn browse_products(
@@ -22,14 +27,23 @@ async fn browse_products(
     let conn = pool.get()?;
     let total_products = crate::db::count_products(&conn)?;
     let total_pages = (total_products as f64 / per_page as f64).ceil() as usize;
-    let products = crate::db::load_products_limited(&conn, per_page, offset)?;
-   
+    let products = crate::db::filter_products(
+        &conn,
+        query.category.as_deref(),
+        query.tag.as_deref(),
+        query.search.as_deref(),
+        query.sort.as_deref(),
+        per_page,
+        offset,
+    )?;
+
     let mut ctx = Context::new();
     ctx.insert("products", &products);
     ctx.insert("site_name", &config.site_name);
     ctx.insert("root_domain", &config.root_domain);
     ctx.insert("current_page", &page);
     ctx.insert("total_pages", &total_pages);
+    //ctx.insert("params", &query);
    
     let rendered = tera.render("products.html", &ctx)?;
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))

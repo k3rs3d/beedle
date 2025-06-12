@@ -9,14 +9,14 @@
 <body>
 
 <header>
-<strong>{{ site_name }}</strong> | <a href="/cart">View Cart</a>
+{% include "header.html" %}
 </header>
 
     {% block content %}
     {% endblock %}
 	
 <footer>
-Powered by beedle!
+{% include "footer.html" %}
 </footer>
 
 </body>
