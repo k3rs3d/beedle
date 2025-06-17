@@ -9,19 +9,36 @@ pub fn get_cart(session: &Session) -> Vec<CartItem> {
     }
 }
 
-pub fn add_to_cart(session: &Session, product_id: u32) {
+// Increase/decrease quantity of item 
+pub fn update_cart_quantity(session: &Session, product_id: u32, quantity: i32) {
     let mut cart = get_cart(session);
-    if let Some(item) = cart.iter_mut().find(|item| item.product_id == product_id) {
-        item.quantity += 1;
-    } else {
-        cart.push(CartItem { product_id, quantity: 1 });
+    // TODO: Don't allow more than Inventory amount
+    // TODO: also set a limit per customer, like ceil(inventory, limit)
+    if quantity > 0 {
+        // Add to cart
+        if let Some(item) = cart.iter_mut().find(|item| item.product_id == product_id) {
+            item.quantity += quantity as u32; // TODO: fix quantity can exceed u32 max value here
+        } else {
+            cart.push(CartItem { product_id, quantity: quantity as u32 });
+        }
+    } else if quantity < 0 {
+        // If the quantity specified is equal to -1, remove the item completely
+        let quantity_abs = quantity.abs() as u32;
+        if quantity_abs == 1 {
+            cart.retain(|item| item.product_id != product_id);
+        } else {
+            // remove if it drops to zero or below
+            if let Some(item) = cart.iter_mut().find(|item| item.product_id == product_id) {
+                if item.quantity > quantity_abs {
+                    item.quantity -= quantity_abs;
+                } else {
+                    // Equivalent to removing the item since its count would become non-positive
+                    cart.retain(|item| item.product_id != product_id);
+                }
+            }
+        }
     }
-    session.insert("cart", &cart).unwrap();
-}
 
-pub fn remove_from_cart(session: &Session, product_id: u32) {
-    let mut cart = get_cart(session);
-    cart.retain(|item| item.product_id != product_id);
     session.insert("cart", &cart).unwrap();
 }
 
@@ -40,8 +57,8 @@ mod tests {
         let session = session.get_session();
         let cart = get_cart(&session);
         assert_eq!(cart.len(), 0);
-        add_to_cart(&session, 1);
-        let cart = get_cart(&session);
+        update_cart_quantity(&session, 1, 1);
+        let cart: Vec<CartItem> = get_cart(&session);
         assert_eq!(cart.len(), 1);
         assert_eq!(cart[0].product_id, 1);
         assert_eq!(cart[0].quantity, 1);
@@ -51,11 +68,11 @@ mod tests {
     async fn test_remove_from_cart() {
         let session = test::TestRequest::default().to_http_request();
         let session = session.get_session();
-        add_to_cart(&session, 1);
-        add_to_cart(&session, 2);
+        update_cart_quantity(&session, 1, 1);
+        update_cart_quantity(&session, 2, 1);
         let cart = get_cart(&session);
         assert_eq!(cart.len(), 2);
-        remove_from_cart(&session, 1);
+        update_cart_quantity(&session, 1, -1);
         let cart = get_cart(&session);
         assert_eq!(cart.len(), 1);
         assert_eq!(cart[0].product_id, 2);
@@ -66,17 +83,6 @@ mod tests {
     async fn test_empty_cart_state() {
         let session = test::TestRequest::default().to_http_request();
         let session = session.get_session();
-        let cart = get_cart(&session);
-        assert!(cart.is_empty());
-    }
-
-    // Customer shouldn't be able to remove nonexistent item 
-    #[actix_rt::test]
-    async fn test_not_updating_nonexistent_cart_item() {
-        let session = test::TestRequest::default().to_http_request();
-        let session = session.get_session();
-
-        remove_from_cart(&session, 1);
         let cart = get_cart(&session);
         assert!(cart.is_empty());
     }
