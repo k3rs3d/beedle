@@ -18,7 +18,7 @@ pub fn seed_example_products(conn: &mut Conn) -> Result<(), BeedleError> {
         return Ok(());
     }
 
-    let now = chrono::Utc::now().naive_utc();
+    //let now = chrono::Utc::now().naive_utc();
 
     let example_products = vec![
         Product {
@@ -305,6 +305,34 @@ pub fn filter_products(
         products.push(p?);
     }
     Ok(products)
+}
+
+pub fn load_product_by_id(conn: &Conn, product_id: i32) -> Result<Option<Product>, BeedleError> {
+    let mut stmt = conn.prepare("SELECT id, name, price, inventory, category, tags, keywords, thumbnail_url, gallery_urls, tagline, description, discount_percent FROM product WHERE id = ?")?;
+    let mut product_iter = stmt.query_map(params![product_id], |row| {
+        Ok(Product {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            price: row.get(2)?,
+            inventory: row.get(3)?,
+            category: row.get(4)?,
+            tags: row.get::<_, String>(5)?.split(',')
+                .map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
+            keywords: row.get::<_, String>(6)?.split(',')
+                .map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
+            thumbnail_url: row.get(7)?,
+            gallery_urls: row.get::<_, String>(8)?.split(',')
+                .map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
+            tagline: row.get(9)?,
+            description: row.get(10)?,
+            discount_percent: row.get(11)?,
+        })
+    })?;
+    
+    match product_iter.next() {
+        Some(product) => Ok(Some(product?)),
+        None => Ok(None),
+    }
 }
 
 pub fn save_product(conn: &mut Conn, product: &Product) -> Result<(), BeedleError> {

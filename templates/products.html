@@ -8,7 +8,7 @@
         {% if product.thumbnail_url %}
             <img src="{{ product.thumbnail_url }}" alt="{{ product.name }} thumbnail" class="product-thumb" style="max-width:100px;max-height:100px;">
         {% endif %}
-        <h3>{{ product.name }}</h3>
+        <a href="/products/{{ product.id }}"><h3>{{ product.name }}</h3></a>
         <p class="tagline">{{ product.tagline }}</p>
         <p>
             <b>Category:</b> {{ product.category }}
