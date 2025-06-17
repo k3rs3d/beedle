@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse};
 use tera::{Tera, Context};
 use crate::config::Config;
-use crate::db::{DbPool, load_products_limited};
+use crate::db::{DbPool};
 use crate::errors::BeedleError;
 use serde::{Serialize, Deserialize};
 

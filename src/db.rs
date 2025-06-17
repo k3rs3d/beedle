@@ -3,10 +3,59 @@ use crate::models::{CartItem, Product};
 use chrono::{NaiveDateTime};
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::params;
+use rusqlite::{Row,params,OptionalExtension};
 
 pub type DbPool = Pool<SqliteConnectionManager>;
 type Conn = PooledConnection<SqliteConnectionManager>;
+
+const CREATE_PRODUCT_TABLE: &str = "CREATE TABLE IF NOT EXISTS product (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    price REAL NOT NULL,
+    inventory INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    tags TEXT,
+    keywords TEXT,
+    thumbnail_url TEXT,
+    gallery_urls TEXT,
+    tagline TEXT,
+    description TEXT,
+    discount_percent REAL
+)";
+
+const SELECT_PRODUCTS_BASE: &str = "SELECT 
+    id, name, price, inventory, category, tags, keywords,
+    thumbnail_url, gallery_urls, tagline, description, discount_percent
+FROM product";
+
+fn parse_product(row: &Row<'_>) -> Result<Product, rusqlite::Error> {
+    Ok(Product {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        price: row.get(2)?,
+        inventory: row.get(3)?,
+        category: row.get(4)?,
+        tags: row.get::<_, String>(5)?
+            .split(',')
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .collect(),
+        keywords: row.get::<_, String>(6)?
+            .split(',')
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .collect(),
+        thumbnail_url: row.get(7)?,
+        gallery_urls: row.get::<_, String>(8)?
+            .split(',')
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .collect(),
+        tagline: row.get(9)?,
+        description: row.get(10)?,
+        discount_percent: row.get(11)?,
+    })
+}
 
 // DEBUG
 // Add fake example products to db
@@ -134,23 +183,7 @@ pub fn establish_connection() -> Result<DbPool, BeedleError> {
 
 pub fn init_db(pool: &DbPool) -> Result<(), BeedleError> {
     let conn = pool.get()?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS product (
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            price REAL NOT NULL,
-            inventory INTEGER NOT NULL,
-            category TEXT NOT NULL,
-            tags TEXT,
-            keywords TEXT,
-            thumbnail_url TEXT,
-            gallery_urls TEXT,
-            tagline TEXT,
-            description TEXT,
-            discount_percent REAL
-    )",
-    [],
-    )?;
+    conn.execute(CREATE_PRODUCT_TABLE, [])?;
     Ok(())
 }
 
@@ -163,57 +196,10 @@ pub fn count_products(conn: &Conn) -> Result<usize, BeedleError> {
 }
 
 pub fn load_products(conn: &Conn) -> Result<Vec<Product>, BeedleError> {
-    let mut stmt = conn.prepare("SELECT id, name, price, inventory, category, tags, keywords, thumbnail_url, gallery_urls, tagline, description, discount_percent FROM product")?;
-    let product_iter = stmt.query_map([], |row| {
-        Ok(Product {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            price: row.get(2)?,
-            inventory: row.get(3)?,
-            category: row.get(4)?,
-            tags: row.get::<_, String>(5)?.split(',').filter(|s| !s.is_empty()).map(|s| s.trim().to_owned()).collect(),
-            keywords: row.get::<_, String>(6)?.split(',').filter(|s| !s.is_empty()).map(|s| s.trim().to_owned()).collect(),
-            thumbnail_url: row.get(7)?,
-            gallery_urls: row.get::<_, String>(8)?.split(',').filter(|s| !s.is_empty()).map(|s| s.trim().to_owned()).collect(),
-            tagline: row.get(9)?,
-            description: row.get(10)?,
-            discount_percent: row.get(11)?,
-        })
-    })?;
-    let mut products = Vec::new();
-    for product in product_iter {
-        products.push(product?);
-    }
-    Ok(products)
+    let mut stmt = conn.prepare(SELECT_PRODUCTS_BASE)?;
+    let products = stmt.query_map([], parse_product)?;
+    products.collect::<Result<_, rusqlite::Error>>().map_err(BeedleError::DatabaseError)
 }
-
-// only load a limited subset,
-// to be used later for filtering products
-pub fn load_products_limited(conn: &Conn, limit: usize, offset: usize) -> Result<Vec<Product>, BeedleError> {
-    let mut stmt = conn.prepare("SELECT id, name, price, inventory, category, tags, keywords, thumbnail_url, gallery_urls, tagline, description, discount_percent FROM product")?;
-    let product_iter = stmt.query_map(params![limit as i64, offset as i64], |row| {
-        Ok(Product {
-            id: row.get(0)?,
-            name: row.get(1)?,
-             price: row.get(2)?,
-            inventory: row.get(3)?,
-            category: row.get(4)?,
-            tags: row.get::<_, String>(5)?.split(',').filter(|s| !s.is_empty()).map(|s| s.trim().to_owned()).collect(),
-            keywords: row.get::<_, String>(6)?.split(',').filter(|s| !s.is_empty()).map(|s| s.trim().to_owned()).collect(),
-            thumbnail_url: row.get(7)?,
-            gallery_urls: row.get::<_, String>(8)?.split(',').filter(|s| !s.is_empty()).map(|s| s.trim().to_owned()).collect(),
-            tagline: row.get(9)?,
-            description: row.get(10)?,
-            discount_percent: row.get(11)?,
-        })
-    })?;
-    let mut products = Vec::new();
-    for product in product_iter {
-        products.push(product?);
-    }
-    Ok(products)
-}
-
 
 pub fn filter_products(
     conn: &Conn,
@@ -224,8 +210,7 @@ pub fn filter_products(
     limit: usize,
     offset: usize,
 ) -> Result<Vec<Product>, BeedleError> {
-    let mut sql = "SELECT id, name, price, inventory, category, tags, keywords, thumbnail_url, gallery_urls, tagline, description, discount_percent FROM product WHERE 1=1".to_owned();
-
+    let mut sql = format!("{} WHERE 1=1", SELECT_PRODUCTS_BASE);
     let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
     let mut backing_strings: Vec<String> = Vec::new(); // To hold any values we format on the fly
     // Backing for numbers
@@ -279,60 +264,14 @@ pub fn filter_products(
     params.push(&offset_i64);
 
     let mut stmt = conn.prepare(&sql)?;
-    let product_iter = stmt.query_map(&params[..], |row| {
-        // ...your Product parsing as before (see above)
-        Ok(Product {
-            id: row.get(0)?,
-           name: row.get(1)?,
-           price: row.get(2)?,
-           inventory: row.get(3)?,
-           category: row.get(4)?,
-           tags: row.get::<_, String>(5)?.split(',')
-           .map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
-           keywords: row.get::<_, String>(6)?.split(',')
-           .map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
-           thumbnail_url: row.get(7)?,
-           gallery_urls: row.get::<_, String>(8)?.split(',')
-           .map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
-           tagline: row.get(9)?,
-           description: row.get(10)?,
-           discount_percent: row.get(11)?,
-        })
-    })?;
-
-    let mut products = Vec::new();
-    for p in product_iter {
-        products.push(p?);
-    }
-    Ok(products)
+    let product_iter = stmt.query_map(&params[..], parse_product)?;
+    
+    product_iter.collect::<Result<_, rusqlite::Error>>().map_err(BeedleError::DatabaseError)
 }
 
 pub fn load_product_by_id(conn: &Conn, product_id: i32) -> Result<Option<Product>, BeedleError> {
-    let mut stmt = conn.prepare("SELECT id, name, price, inventory, category, tags, keywords, thumbnail_url, gallery_urls, tagline, description, discount_percent FROM product WHERE id = ?")?;
-    let mut product_iter = stmt.query_map(params![product_id], |row| {
-        Ok(Product {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            price: row.get(2)?,
-            inventory: row.get(3)?,
-            category: row.get(4)?,
-            tags: row.get::<_, String>(5)?.split(',')
-                .map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
-            keywords: row.get::<_, String>(6)?.split(',')
-                .map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
-            thumbnail_url: row.get(7)?,
-            gallery_urls: row.get::<_, String>(8)?.split(',')
-                .map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
-            tagline: row.get(9)?,
-            description: row.get(10)?,
-            discount_percent: row.get(11)?,
-        })
-    })?;
-    
-    match product_iter.next() {
-        Some(product) => Ok(Some(product?)),
-        None => Ok(None),
-    }
+    let mut stmt = conn.prepare(&format!("{} WHERE id = ?", SELECT_PRODUCTS_BASE))?;
+    stmt.query_row(params![product_id], parse_product).optional().map_err(BeedleError::DatabaseError)
 }
 
 pub fn save_product(conn: &mut Conn, product: &Product) -> Result<(), BeedleError> {
@@ -399,49 +338,29 @@ pub fn save_product(conn: &mut Conn, product: &Product) -> Result<(), BeedleErro
     }
 }
 
-pub fn update_inventory(conn: &mut Conn, cart: &Vec<CartItem>) -> Result<(), BeedleError> {
+pub fn update_inventory(conn: &mut Conn, cart: &[CartItem]) -> Result<(), BeedleError> {
     let transaction = conn.transaction()?;
 
     for cart_item in cart {
-        let product_result = transaction.query_row(
-            "SELECT id, name, price, inventory, category, tags, keywords, thumbnail_url, gallery_urls, tagline, description, discount_percent FROM product WHERE id = ?1",
-            params![cart_item.product_id],
-            |row| {
-                Ok(Product {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    price: row.get(2)?,
-                    inventory: row.get(3)?,
-                    category: row.get(4)?,
-                    tags: row.get::<_, String>(5)?.split(',').filter(|s| !s.is_empty()).map(|s| s.trim().to_owned()).collect(),
-                    keywords: row.get::<_, String>(6)?.split(',').filter(|s| !s.is_empty()).map(|s| s.trim().to_owned()).collect(),
-                    thumbnail_url: row.get(7)?,
-                    gallery_urls: row.get::<_, String>(8)?.split(',').filter(|s| !s.is_empty()).map(|s| s.trim().to_owned()).collect(),
-                    tagline: row.get(9)?,
-                    description: row.get(10)?,
-                    discount_percent: row.get(11)?,
-                })
-            },
-        );
+        let product_result = transaction
+            .query_row(&format!("{} WHERE id = ?", SELECT_PRODUCTS_BASE), params![cart_item.product_id], parse_product);
+
         if let Ok(mut product) = product_result {
             if product.inventory >= cart_item.quantity {
                 product.inventory -= cart_item.quantity;
                 transaction.execute(
-                    "UPDATE product SET inventory = ?1 WHERE id = ?2",
+                    "UPDATE product SET inventory = ? WHERE id = ?",
                     params![product.inventory, product.id],
                 )?;
             } else {
-                return Err(BeedleError::InventoryError(
-                    "Not enough inventory".to_string(),
-                ));
+                return Err(BeedleError::InventoryError("Not enough inventory".to_string()));
             }
         } else {
             return Err(BeedleError::InventoryError("Product not found".to_string()));
         }
     }
 
-    transaction.commit()?;
-    Ok(())
+    transaction.commit().map_err(BeedleError::DatabaseError)
 }
 
 pub fn delete_product(conn: &mut Conn, product_id: i32) -> Result<(), BeedleError> {
@@ -465,5 +384,130 @@ pub fn delete_product(conn: &mut Conn, product_id: i32) -> Result<(), BeedleErro
             log::error!("Failed to execute delete product SQL: {:?}", e);
             Err(BeedleError::DatabaseError(e))
         }
+    }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::Product;
+    use r2d2_sqlite::SqliteConnectionManager;
+
+    fn setup_test_db() -> DbPool {
+        let manager = SqliteConnectionManager::memory();
+        let pool: DbPool = Pool::builder().max_size(1).build(manager).expect("Failed to create pool.");
+        
+        let conn = pool.get().expect("Failed to get connection");
+        conn.execute(CREATE_PRODUCT_TABLE, []).unwrap();
+
+        pool
+    }
+
+    #[test]
+    fn test_parse_product() {
+        let pool = setup_test_db();
+        let conn = pool.get().expect("Failed to get connection");
+        let product_row = conn.prepare(
+            "INSERT INTO product 
+            (name, price, inventory, category, tags, keywords, thumbnail_url, gallery_urls, tagline, description, discount_percent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).and_then(|mut stmt| {
+            stmt.insert(params![
+                "Test Product",
+                9.99,
+                10,
+                "Something",
+                "test,example",
+                "anything,nothing",
+                Some("http://example.com/thumbnail.jpg"),
+                "http://example.com/gallery1.jpg,http://example.com/gallery2.jpg",
+                "An amazing Test Product!",
+                Some("The best Test Product you will ever see."),
+                0.0
+            ])
+        }).expect("Inserting test product");
+
+        let result = conn.query_row(
+            "SELECT id, name, price, inventory, category, tags, keywords, thumbnail_url, gallery_urls, tagline, description, discount_percent FROM product WHERE rowid = ?1", 
+            params![product_row], 
+            parse_product
+        );
+        assert!(result.is_ok());
+        let product = result.unwrap();
+        assert_eq!(product.name, "Test Product");
+        assert_eq!(product.price, 9.99);
+        assert_eq!(product.inventory, 10);
+    }
+
+    #[test]
+    fn test_seed_example_products() {
+        let pool = setup_test_db();
+        let mut conn = pool.get().expect("Failed to get connection");
+        let result = seed_example_products(&mut conn);
+        assert!(result.is_ok());
+
+        let count = count_products(&conn).expect("Counting products");
+        assert!(count > 0);
+    }
+
+    #[test]
+    fn test_count_products() {
+        let pool = setup_test_db();
+        let conn = pool.get().expect("Failed to get connection");
+        // Assuming the database is empty before we count
+        let count = count_products(&conn).expect("Counting products");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_load_products() {
+        let pool = setup_test_db();
+        let mut conn = pool.get().expect("Failed to get connection");
+        seed_example_products(&mut conn).expect("Seeding products");
+        let products = load_products(&conn).expect("Loading products");
+        assert!(!products.is_empty());
+    }
+
+    #[test]
+    fn test_save_product_insert() {
+        let pool = setup_test_db();
+        let mut conn = pool.get().expect("Failed to get connection");
+
+        let new_product = Product {
+            id: None,
+            name: "New Product".to_string(),
+            price: 29.99,
+            inventory: 15,
+            category: "Misc".to_string(),
+            tags: Vec::new(),
+            keywords: Vec::new(),
+            thumbnail_url: None,
+            gallery_urls: Vec::new(),
+            tagline: "A brand new product".to_string(),
+            description: None,
+            discount_percent: None,
+        };
+
+        let result = save_product(&mut conn, &new_product);
+        assert!(result.is_ok());
+
+        let count = count_products(&conn).unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_delete_product() {
+        let pool = setup_test_db();
+        let mut conn = pool.get().expect("Failed to get connection");
+        seed_example_products(&mut conn).expect("Seeding products");
+        // Assuming we know the ID of product to delete is 1 for testing purpose
+        let result = delete_product(&mut conn, 1);
+        assert!(result.is_ok());
+
+        let count = count_products(&conn).unwrap();
+        // One less than the seeded number (if 6 are seeded)
+        assert_eq!(count, 5); 
     }
 }
