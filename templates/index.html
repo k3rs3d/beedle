@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
-<p>This is the front page.</p>
-<p><ul>
-<li><a href="/products"></a>Product List</li>
-<li><a href="/cart"></a>View Cart</li>
+<p>Welcome to the store!</p>
+<p>
+{% for category in categories %}
+<li><a href="/products?category={{ category | urlencode }}">{{ category }}</a></li>
+{% endfor %}
 <br>
 <li><a href="/admin/products">Admin Panel</a></li>
-</ul></p>
+</p>
 {% endblock %}

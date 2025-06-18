@@ -201,6 +201,13 @@ pub fn load_products(conn: &Conn) -> Result<Vec<Product>, BeedleError> {
     products.collect::<Result<_, rusqlite::Error>>().map_err(BeedleError::DatabaseError)
 }
 
+pub fn load_categories(conn: &Conn) -> Result<Vec<String>, BeedleError> {
+    let mut stmt = conn.prepare("SELECT DISTINCT category FROM product")?;
+    let categories_iter = stmt.query_map([], |row| row.get(0))?;
+    
+    categories_iter.collect::<Result<_, rusqlite::Error>>().map_err(BeedleError::DatabaseError)
+}
+
 pub fn filter_products(
     conn: &Conn,
     category: Option<&str>,

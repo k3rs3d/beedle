@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse};
 use actix_session::Session;
-use tera::{Tera, Context};
+use tera::Tera;
 use crate::config::Config;
 use crate::db::{DbPool};
 use crate::errors::BeedleError;
