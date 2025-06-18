@@ -1,8 +1,10 @@
 use actix_web::{web, HttpResponse};
+use actix_session::Session;
 use tera::{Tera, Context};
 use crate::config::Config;
 use crate::db::{DbPool};
 use crate::errors::BeedleError;
+use crate::session::create_base_context;
 use serde::{Serialize, Deserialize};
 
 #[derive(Deserialize, Serialize)]
@@ -18,7 +20,8 @@ async fn browse_products(
     pool: web::Data<DbPool>,
     tera: web::Data<Tera>,
     config: web::Data<Config>,
-    query: web::Query<ListParams>
+    query: web::Query<ListParams>,
+    session: Session
 ) -> Result<HttpResponse, BeedleError> {
     let page = query.page.unwrap_or(1); // /products?page=N
     let per_page = 2;
@@ -37,10 +40,8 @@ async fn browse_products(
         offset,
     )?;
 
-    let mut ctx = Context::new();
+    let mut ctx = create_base_context(&session, config.get_ref());
     ctx.insert("products", &products);
-    ctx.insert("site_name", &config.site_name);
-    ctx.insert("root_domain", &config.root_domain);
     ctx.insert("current_page", &page);
     ctx.insert("total_pages", &total_pages);
     //ctx.insert("params", &query);

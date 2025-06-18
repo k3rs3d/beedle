@@ -2,6 +2,8 @@ use crate::config::Config;
 use crate::db::{delete_product, load_products, save_product, DbPool};
 use crate::errors::BeedleError;
 use crate::models::Product;
+use crate::session::create_base_context;
+use actix_session::Session;
 use actix_web::{web, HttpResponse};
 use serde::{Serialize, Deserialize};
 use tera::Tera;
@@ -24,12 +26,13 @@ pub struct ProductForm {
 async fn list_products(
     pool: web::Data<DbPool>,
     tera: web::Data<Tera>,
-    config: web::Data<Config>,
+    session: Session,
+    config: web::Data<Config>
 ) -> Result<HttpResponse, BeedleError> {
     let conn = pool.get()?;
     let products = load_products(&conn)?;
 
-    let mut ctx = tera::Context::new();
+    let mut ctx = create_base_context(&session, config.get_ref());
     ctx.insert("products", &products);
     ctx.insert("site_name", &config.site_name); // TODO: make a generic context insertion as a base 
 
@@ -39,10 +42,10 @@ async fn list_products(
 
 async fn add_product_form(
     tera: web::Data<Tera>,
-    config: web::Data<Config>,
+    session: Session,
+    config: web::Data<Config>
 ) -> Result<HttpResponse, BeedleError> {
-    let mut ctx = tera::Context::new();
-    ctx.insert("site_name", &config.site_name);
+    let ctx = create_base_context(&session, config.get_ref());
 
     let rendered = tera.render("admin/add_product.html", &ctx)?;
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))

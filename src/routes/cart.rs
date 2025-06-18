@@ -5,7 +5,7 @@ use crate::errors::BeedleError;
 use crate::config::Config;
 use crate::db::{DbPool, load_products};
 use crate::models::Product;
-use crate::session::{get_cart, update_cart_quantity};
+use crate::session::{get_cart, update_cart_quantity, create_base_context};
 
 #[derive(serde::Deserialize)]
 struct AddToCartInfo {
@@ -44,7 +44,7 @@ async fn view_cart(
         })
         .filter_map(|item| item)
         .collect();
-    let mut ctx = Context::new();
+    let mut ctx = create_base_context(&session, config.get_ref());
     ctx.insert("cart_items", &cart_items);
     ctx.insert("site_name", &config.site_name);
    

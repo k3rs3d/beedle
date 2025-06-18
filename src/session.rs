@@ -1,6 +1,20 @@
 use actix_session::Session;
 use crate::models::CartItem;
 
+// A starter tera context with generic elements added 
+pub fn create_base_context(session:&Session, config: &crate::config::Config) -> tera::Context {
+    let mut ctx = tera::Context::new();
+    ctx.insert("site_name", &config.site_name);
+    ctx.insert("root_domain", &config.root_domain);
+    ctx.insert("cart_item_count", &get_cart_item_count(session));
+    ctx
+}
+
+// Num items in cart
+pub fn get_cart_item_count(session: &Session) -> u32 {
+    get_cart(session).iter().map(|item| item.quantity).sum()
+}
+
 // Retrieve current cart from session
 pub fn get_cart(session: &Session) -> Vec<CartItem> {
     match session.get::<Vec<CartItem>>("cart") {

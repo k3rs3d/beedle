@@ -1,8 +1,10 @@
 use actix_web::{web, HttpResponse};
+use actix_session::Session;
 use tera::{Tera, Context};
 use crate::config::Config;
 use crate::db::{DbPool, load_product_by_id};
 use crate::errors::BeedleError;
+use crate::session::create_base_context;
 use serde::{Deserialize};
 
 #[derive(Deserialize)]
@@ -14,16 +16,15 @@ async fn product_detail(
     pool: web::Data<DbPool>,
     tera: web::Data<Tera>,
     config: web::Data<Config>,
-    path: web::Path<ProductPath>
+    path: web::Path<ProductPath>,
+    session: Session
 ) -> Result<HttpResponse, BeedleError> {
     let conn = pool.get()?;
     let product = load_product_by_id(&conn, path.product_id)?;
 
     if let Some(product) = product {
-        let mut ctx = Context::new();
+        let mut ctx = create_base_context(&session, config.get_ref());
         ctx.insert("product", &product);
-        ctx.insert("site_name", &config.site_name);
-        ctx.insert("root_domain", &config.root_domain);
 
         let rendered = tera.render("product.html", &ctx)?;
         Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
