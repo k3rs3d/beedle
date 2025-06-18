@@ -5,6 +5,8 @@ use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{Row,params,OptionalExtension};
 
+pub mod cache;
+
 pub type DbPool = Pool<SqliteConnectionManager>;
 type Conn = PooledConnection<SqliteConnectionManager>;
 
@@ -184,9 +186,11 @@ pub fn establish_connection() -> Result<DbPool, BeedleError> {
 pub fn init_db(pool: &DbPool) -> Result<(), BeedleError> {
     let conn = pool.get()?;
     conn.execute(CREATE_PRODUCT_TABLE, [])?;
+    cache::initialize_caches(&conn)?;
     Ok(())
 }
 
+// PRODUCTS
 // Total product count
 pub fn count_products(conn: &Conn) -> Result<usize, BeedleError> {
     let count: usize = conn.query_row(
@@ -199,13 +203,6 @@ pub fn load_products(conn: &Conn) -> Result<Vec<Product>, BeedleError> {
     let mut stmt = conn.prepare(SELECT_PRODUCTS_BASE)?;
     let products = stmt.query_map([], parse_product)?;
     products.collect::<Result<_, rusqlite::Error>>().map_err(BeedleError::DatabaseError)
-}
-
-pub fn load_categories(conn: &Conn) -> Result<Vec<String>, BeedleError> {
-    let mut stmt = conn.prepare("SELECT DISTINCT category FROM product")?;
-    let categories_iter = stmt.query_map([], |row| row.get(0))?;
-    
-    categories_iter.collect::<Result<_, rusqlite::Error>>().map_err(BeedleError::DatabaseError)
 }
 
 pub fn filter_products(

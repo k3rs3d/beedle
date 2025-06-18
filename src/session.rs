@@ -9,7 +9,7 @@ pub fn create_base_context(session:&Session, config: &crate::config::Config) -> 
     ctx.insert("cart_item_count", &get_cart_item_count(session));
     ctx
 }
-
+ 
 // Num items in cart
 pub fn get_cart_item_count(session: &Session) -> u32 {
     get_cart(session).iter().map(|item| item.quantity).sum()
