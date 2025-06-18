@@ -1,6 +1,7 @@
 use actix_web::{web, HttpResponse};
 use actix_session::Session;
-use tera::{Tera, Context};
+use actix_csrf::extractor::CsrfToken;
+use tera::Tera;
 use crate::config::Config;
 use crate::db::{DbPool, load_product_by_id};
 use crate::errors::BeedleError;
@@ -17,6 +18,7 @@ async fn product_detail(
     tera: web::Data<Tera>,
     config: web::Data<Config>,
     path: web::Path<ProductPath>,
+    csrf_token: CsrfToken,
     session: Session
 ) -> Result<HttpResponse, BeedleError> {
     let conn = pool.get()?;
@@ -25,6 +27,7 @@ async fn product_detail(
     if let Some(product) = product {
         let mut ctx = create_base_context(&session, config.get_ref());
         ctx.insert("product", &product);
+        ctx.insert("csrf_token", &csrf_token);
 
         let rendered = tera.render("product.html", &ctx)?;
         Ok(HttpResponse::Ok().content_type("text/html").body(rendered))

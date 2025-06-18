@@ -1,5 +1,6 @@
 use actix_web::{middleware, App, cookie::Key, HttpServer, web::Data};
 use actix_session::{SessionMiddleware, storage::CookieSessionStore};
+use actix_csrf::CsrfMiddleware;
 use actix_files::Files;
 use dotenv::dotenv;
 use std::env;
@@ -49,16 +50,23 @@ async fn main() -> Result<(), BeedleError> {
     crate::db::seed_example_products(&mut conn).expect("Failed to seed products.");
 
     HttpServer::new(move || {
+        let csrf = CsrfMiddleware::with_rng(rand::rngs::OsRng)
+        .set_cookie(actix_web::http::Method::GET, "/add_to_cart")
+        .set_cookie(actix_web::http::Method::GET, "/cart")
+        .set_cookie(actix_web::http::Method::GET, "/product")
+        .set_cookie(actix_web::http::Method::GET, "/products");
+
         App::new()
             .app_data(Data::new(pool.clone()))
             .app_data(Data::new(config.clone())) // Add config to app data
             .app_data(Data::new(tera.clone()))   // Add Tera to app data
-            .wrap(middleware::Logger::default()) // Logger
+            .wrap(csrf)
             .configure(routes::init) // Init routes
             .wrap(SessionMiddleware::new(
                 CookieSessionStore::default(),
                 secret_key.clone(),
-            ))            
+            ))
+            .wrap(middleware::Logger::default()) // Logger            
             .service(Files::new("/static", "./static").show_files_listing()) // Serve files from `static` directory
             // TODO: Make the static directory configurable 
     })

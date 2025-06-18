@@ -20,6 +20,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "actix-csrf"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d6604913d54205a3a5c0e43869a8e7501a2af7d7913b6653fd73f04ba292111"
+dependencies = [
+ "actix-web",
+ "base64 0.21.7",
+ "cookie",
+ "rand",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "actix-files"
 version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -564,6 +578,12 @@ checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
 
 [[package]]
 name = "base64"
+version = "0.21.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
+
+[[package]]
+name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
@@ -572,6 +592,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 name = "beedle"
 version = "0.1.0"
 dependencies = [
+ "actix-csrf",
  "actix-files",
  "actix-rt",
  "actix-service",
@@ -587,6 +608,7 @@ dependencies = [
  "once_cell",
  "r2d2",
  "r2d2_sqlite",
+ "rand",
  "reqwest",
  "rusqlite",
  "serde",
@@ -2874,7 +2896,19 @@ checksum = "c3523ab5a71916ccf420eebdf5521fcef02141234bbc0b8a49f2fdc4544364ef"
 dependencies = [
  "log",
  "pin-project-lite",
+ "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-attributes"
+version = "0.1.30"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81383ab64e72a7a8b8e13130c49e3dab29def6d0c7d76a03087b3cf71c5c6903"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

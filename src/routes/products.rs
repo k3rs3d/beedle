@@ -1,5 +1,6 @@
 use actix_web::{web, HttpResponse};
 use actix_session::Session;
+use actix_csrf::extractor::CsrfToken;
 use tera::Tera;
 use crate::config::Config;
 use crate::db::{DbPool};
@@ -21,6 +22,7 @@ async fn browse_products(
     tera: web::Data<Tera>,
     config: web::Data<Config>,
     query: web::Query<ListParams>,
+    csrf_token: CsrfToken,
     session: Session
 ) -> Result<HttpResponse, BeedleError> {
     let page = query.page.unwrap_or(1); // /products?page=N
@@ -44,7 +46,7 @@ async fn browse_products(
     ctx.insert("products", &products);
     ctx.insert("current_page", &page);
     ctx.insert("total_pages", &total_pages);
-    //ctx.insert("params", &query);
+    ctx.insert("csrf_token", &csrf_token);
    
     let rendered = tera.render("products.html", &ctx)?;
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
@@ -59,7 +61,9 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 mod tests {
     use super::*;
     use actix_web::{test, web::Data, App};
+    use actix_csrf::CsrfMiddleware;
     use crate::db::establish_connection;
+    use rand::rngs::OsRng;
 
     #[actix_rt::test]
     async fn test_browse_products() {
@@ -70,11 +74,18 @@ mod tests {
             root_domain: String::from("http://localhost"),
         };
 
+        let csrf = CsrfMiddleware::with_rng(rand::rngs::OsRng)
+        .set_cookie(actix_web::http::Method::GET, "/add_to_cart")
+        .set_cookie(actix_web::http::Method::GET, "/cart")
+        .set_cookie(actix_web::http::Method::GET, "/product")
+        .set_cookie(actix_web::http::Method::GET, "/products");
+
         let mut app = test::init_service(
             App::new()
                 .app_data(Data::new(pool.clone()))
                 .app_data(Data::new(tera))
                 .app_data(Data::new(config))
+                .wrap(csrf)
                 .configure(init)
         ).await;
 

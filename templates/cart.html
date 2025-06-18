@@ -8,12 +8,16 @@
     <ul>
     {% for item in cart_items %}
         <li><a href="/products/{{ item.0.id }}">{{ item.0.name }}</a><br>Quantity: {{ item.1 }}</li>
-        <form action="/remove_from_cart/{{ item.0.id }}" method="post">
+        <form action="/remove_from_cart/" method="post">
+            <input type="hidden" name="product_id" value="{{ item.0.id }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="quantity" value="-1">
             <button type="submit">Remove</button>
         </form>
     {% endfor %}
     </ul>
     <form action="/checkout" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit">Checkout</button>
     </form>
 {% endif %}
