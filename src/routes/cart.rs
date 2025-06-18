@@ -9,15 +9,15 @@ use crate::session::{get_cart, update_cart_quantity};
 
 #[derive(serde::Deserialize)]
 struct AddToCartInfo {
+    product_id: u32,
     quantity: i32,
 }
 
 async fn add_to_cart(
     session: Session,
-    product_id: web::Path<u32>,
     info: web::Form<AddToCartInfo>, 
 ) -> Result<HttpResponse, BeedleError> {
-    update_cart_quantity(&session, *product_id, info.quantity);
+    update_cart_quantity(&session, info.product_id, info.quantity);
     Ok(HttpResponse::SeeOther().append_header((header::LOCATION, "/products")).finish())
 }
 
@@ -57,7 +57,7 @@ async fn view_cart(
 }
 
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/add_to_cart/{product_id}").route(web::post().to(add_to_cart)))
+    cfg.service(web::resource("/add_to_cart/").route(web::post().to(add_to_cart)))
        .service(web::resource("/remove_from_cart/{product_id}").route(web::post().to(remove_from_cart)))
         .service(web::resource("/cart").route(web::get().to(view_cart)));
 }

@@ -3,51 +3,55 @@
 {% block content %}
 <div class="product-detail">
     {% if product.thumbnail_url %}
-      <img src="{{ product.thumbnail_url }}" alt="{{ product.name }} thumbnail" class="product-image" style="max-width:200px;max-height:200px;">
+    <img src="{{ product.thumbnail_url }}" alt="{{ product.name }} thumbnail" class="product-image"
+        style="max-width:200px;max-height:200px;">
     {% endif %}
-<p><ul>
+    <p>
+    <ul>
 
-<h1>{{ product.name }}</h1>
-  <h2 class="tagline">{{ product.tagline }}</h2>
-  <div>
-      <p><b>Price:</b>
-          {% if product.discount_percent and product.discount_percent > 0 %}
-              {% set discount = product.price * (1.0 - product.discount_percent / 100.0) %}
-              <span class="discounted">
-                  <s>${{ product.price }}</s>
-                  ${{ discount | round(precision=2) }}
-                  <span class="discount-label">-{{ product.discount_percent | round(precision=2) }}%!</span>
-              </span>
-          {% else %}
-              ${{ product.price }}
-          {% endif %}
-      </p>
-      <p><b>Category:</b> {{ product.category }}</p>
-      {% if product.tags and product.tags | length > 0 %}
-      <p><b>Tags:</b>
-          {% for tag in product.tags %}
-              <span class="tag">{{ tag }}</span>{% if not loop.last %}, {% endif %}
-          {% endfor %}
-      </p>
-      {% endif %}
-      <p><b>Inventory:</b> {{ product.inventory }}</p>
-      {% if product.gallery_urls and product.gallery_urls | length > 0 %}
-          <div class="gallery">
-              {% for img in product.gallery_urls %}
-                  <img src="{{ img }}" alt="{{ product.name }} gallery photo" class="gallery-item">
-              {% endfor %}
-          </div>
-      {% endif %}
-      {% if product.description %}
-          <div class="description">
-              <h3>Description</h3>
-              <p>{{ product.description }}</p>
-          </div>
-      {% endif %}
-  </div>
-  <form action="/add_to_cart/{{ product.id }}" method="post">
-      <button type="submit">Add to Cart</button>
-  </form>
+        <h1>{{ product.name }}</h1>
+        <h2 class="tagline">{{ product.tagline }}</h2>
+        <div>
+            <p><b>Price:</b>
+                {% if product.discount_percent and product.discount_percent > 0 %}
+                {% set discount = product.price * (1.0 - product.discount_percent / 100.0) %}
+                <span class="discounted">
+                    <s>${{ product.price }}</s>
+                    ${{ discount | round(precision=2) }}
+                    <span class="discount-label">-{{ product.discount_percent | round(precision=2) }}%!</span>
+                </span>
+                {% else %}
+                ${{ product.price }}
+                {% endif %}
+            </p>
+            <p><b>Category:</b> {{ product.category }}</p>
+            {% if product.tags and product.tags | length > 0 %}
+            <p><b>Tags:</b>
+                {% for tag in product.tags %}
+                <span class="tag">{{ tag }}</span>{% if not loop.last %}, {% endif %}
+                {% endfor %}
+            </p>
+            {% endif %}
+            <p><b>Inventory:</b> {{ product.inventory }}</p>
+            {% if product.gallery_urls and product.gallery_urls | length > 0 %}
+            <div class="gallery">
+                {% for img in product.gallery_urls %}
+                <img src="{{ img }}" alt="{{ product.name }} gallery photo" class="gallery-item">
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if product.description %}
+            <div class="description">
+                <h3>Description</h3>
+                <p>{{ product.description }}</p>
+            </div>
+            {% endif %}
+        </div>
+        <form action="/add_to_cart/" method="post">
+            <input type="hidden" name="product_id" value="{{ product.id }}">
+            <input type="hidden" name="quantity" min="1" value="1">
+            <button type="submit">Add to Cart</button>
+        </form>
 </div>
 <hr>
 <a href="/products">&laquo; Back to product listing</a>
