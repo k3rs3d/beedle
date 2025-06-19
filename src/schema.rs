@@ -1,23 +1,18 @@
-use rusqlite::{Connection, Result};
-use serde::{Deserialize, Serialize};
+// @generated automatically by Diesel CLI.
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Product {
-    pub id: Option<i32>,
-    pub name: String,
-    pub price: f64,
-    pub inventory: i32,
-}
-
-pub fn init_db(conn: &Connection) -> Result<()> {
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS product (
-            id              INTEGER PRIMARY KEY,
-            name            TEXT NOT NULL,
-            price           REAL NOT NULL,
-            inventory       INTEGER NOT NULL
-        )",
-        [],
-    )?;
-    Ok(())
+diesel::table! {
+    product (id) {
+        id -> Int4,
+        name -> Text,
+        price -> Numeric,
+        inventory -> Int4,
+        category -> Text,
+        tags -> Nullable<Text>,
+        keywords -> Nullable<Text>,
+        thumbnail_url -> Nullable<Text>,
+        gallery_urls -> Nullable<Text>,
+        tagline -> Nullable<Text>,
+        description -> Nullable<Text>,
+        discount_percent -> Nullable<Float4>,
+    }
 }

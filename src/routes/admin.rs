@@ -1,26 +1,27 @@
 use crate::config::Config;
 use crate::db::{delete_product, load_products, save_product, DbPool};
 use crate::errors::BeedleError;
-use crate::models::Product;
+use crate::models::NewProduct;
 use crate::session::create_base_context;
 use actix_session::Session;
 use actix_web::{web, HttpResponse};
+use diesel::RunQueryDsl;
 use serde::{Serialize, Deserialize};
 use tera::Tera;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug,Deserialize)]
 pub struct ProductForm {
     pub name: String,
-    pub price: f64,
-    pub inventory: u32,
-
+    pub price: bigdecimal::BigDecimal,
+    pub inventory: i32,
     pub category: Option<String>,
     pub tags: Option<Vec<String>>,
+    pub keywords: Option<Vec<String>>,
     pub thumbnail_url: Option<String>,
     pub gallery_urls: Option<Vec<String>>,
     pub tagline: Option<String>,
     pub description: Option<String>,
-    pub discount_percent: Option<f64>,
+    pub discount_percent: Option<f32>,
 }
 
 async fn list_products(
@@ -29,8 +30,8 @@ async fn list_products(
     session: Session,
     config: web::Data<Config>
 ) -> Result<HttpResponse, BeedleError> {
-    let conn = pool.get()?;
-    let products = load_products(&conn)?;
+    let mut conn = pool.get()?;
+    let products = load_products(&mut conn)?;
 
     let mut ctx = create_base_context(&session, config.get_ref());
     ctx.insert("products", &products);
@@ -56,33 +57,44 @@ async fn add_product(
     form: web::Form<ProductForm>,
 ) -> Result<HttpResponse, BeedleError> {
     log::info!("Received add product form data: {:?}", form);
+
     let mut conn = pool.get()?;
 
-    let new_product = Product {
-        id: None,
+    // Convert Vec<String> to comma-separated String (for CSV storage)
+    let tags_csv = form.tags.as_ref().map(|v| v.join(","));
+    let keywords_csv = form.keywords.as_ref().map(|v| v.join(","));
+    let gallery_urls_csv = form.gallery_urls.as_ref().map(|v| v.join(","));
+
+    let new_product = NewProduct {
         name: form.name.clone(),
-        price: form.price,
+        price: form.price.clone(),
         inventory: form.inventory,
         category: form.category.clone().unwrap_or_else(|| "Uncategorized".to_string()),
-        tags: form.tags.clone().unwrap_or_default(),
-        keywords: vec![],
+        tags: tags_csv,
+        keywords: keywords_csv,
         thumbnail_url: form.thumbnail_url.clone(),
-        gallery_urls: form.gallery_urls.clone().unwrap_or_default(),
-        tagline: form.tagline.clone().unwrap_or_default(),
+        gallery_urls: gallery_urls_csv,
+        tagline: form.tagline.clone(),
         description: form.description.clone(),
         discount_percent: form.discount_percent,
     };
 
-    if let Err(e) = save_product(&mut conn, &new_product) {
-        log::error!("Failed to save product: {:?}", e);
-        return Err(e);
-    } else {
-        log::info!("Product saved successfully: {:?}", form);
+    use crate::schema::product::dsl::*;
+    match diesel::insert_into(product)
+        .values(&new_product)
+        .execute(&mut conn)
+    {
+        Ok(_) => {
+            log::info!("Product saved successfully: {:?}", new_product);
+            Ok(HttpResponse::SeeOther()
+                .append_header(("Location", "/admin/products"))
+                .finish())
+        }
+        Err(e) => {
+            log::error!("Failed to save product: {:?}", e);
+            Err(BeedleError::DatabaseError(e.to_string()))
+        }
     }
-
-    Ok(HttpResponse::SeeOther()
-        .append_header(("Location", "/admin/products"))
-        .finish())
 }
 
 async fn remove_product(

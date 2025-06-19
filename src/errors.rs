@@ -6,7 +6,7 @@ use std::io;
 #[derive(Error, Debug)]
 pub enum BeedleError {
     #[error("Database error: {0}")]
-    DatabaseError(#[from] rusqlite::Error),
+    DatabaseError(String),
     
     #[error("Template error: {0}")]
     TemplateError(#[from] tera::Error),
@@ -28,9 +28,6 @@ pub enum BeedleError {
 
     #[error("Pool error: {0}")]
     PoolError(#[from] r2d2::Error),
-    
-    //#[error("Unknown error")]
-    //Unknown,
 }
 
 // Actix response error 

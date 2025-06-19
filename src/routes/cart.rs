@@ -10,7 +10,7 @@ use crate::session::{get_cart, update_cart_quantity, create_base_context};
 
 #[derive(serde::Deserialize)]
 struct AddToCartInfo {
-    product_id: u32,
+    product_id: i32,
     quantity: i32,
     csrf_token: CsrfToken
 }
@@ -46,14 +46,14 @@ async fn view_cart(
     session: Session,
     csrf_token: CsrfToken
 ) -> Result<HttpResponse, BeedleError> {
-    let conn = pool.get()?;
+    let mut conn = pool.get()?;
     let cart = get_cart(&session);
-    let products = load_products(&conn)?;
+    let products = load_products(&mut conn)?;
    
     let cart_items: Vec<(Product, u32)> = cart.iter()
         .map(|item| {
             products.iter() // TODO: Better handling for Some(id):
-                .find(|product| product.id == Some(item.product_id))
+                .find(|product| product.id == item.product_id)
                 .map(|product| (product.clone(), item.quantity))
         })
         .filter_map(|item| item)

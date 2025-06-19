@@ -24,7 +24,7 @@ pub fn get_cart(session: &Session) -> Vec<CartItem> {
 }
 
 // Increase/decrease quantity of item 
-pub fn update_cart_quantity(session: &Session, product_id: u32, quantity: i32) {
+pub fn update_cart_quantity(session: &Session, product_id: i32, quantity: i32) {
     let mut cart = get_cart(session);
     // TODO: Don't allow more than Inventory amount
     // TODO: also set a limit per customer, like ceil(inventory, limit)

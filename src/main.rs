@@ -7,13 +7,14 @@ use std::env;
 use tera::Tera;
 
 mod config;
-mod db;
+mod db; mod schema;
 //mod email;
 mod errors;
 mod models;
 mod pay;
 mod routes;
 mod session;
+mod views;
 
 use errors::BeedleError;
 
@@ -22,13 +23,17 @@ fn init_environment() {
 }
 
 fn get_secret_key() -> Key {
-    Key::generate()
+    let key_hex = env::var("SESSION_KEY").expect("SESSION_KEY must be set in .env!");
+    let key_bytes = hex::decode(key_hex).expect("SESSION_KEY must be valid hex");
+    Key::derive_from(&key_bytes)
 }
 
 #[actix_web::main]
 async fn main() -> Result<(), BeedleError> {
-    std::env::set_var("RUST_LOG", "debug");
     init_environment();
+
+    std::env::set_var("RUST_LOG", "info");
+    env_logger::init();
 
     // Load config settings 
     let config = config::Config::from_file("config.json").map_err(|e| errors::BeedleError::ConfigError(e.to_string()))?;
@@ -42,30 +47,26 @@ async fn main() -> Result<(), BeedleError> {
 
     // Establish connection and initialize the database
     let pool = crate::db::establish_connection().expect("Failed to create pool.");
-    // Initialize database
-    crate::db::init_db(&pool).expect("Failed to initialize database.");
-
-    // DEBUG - seed example products
     let mut conn = pool.get().unwrap();
-    crate::db::seed_example_products(&mut conn).expect("Failed to seed products.");
+    // Initialize database
+    crate::db::init_db(&mut conn).expect("Failed to initialize database.");
 
     HttpServer::new(move || {
         let csrf = CsrfMiddleware::with_rng(rand::rngs::OsRng)
-        .set_cookie(actix_web::http::Method::GET, "/add_to_cart")
         .set_cookie(actix_web::http::Method::GET, "/cart")
-        .set_cookie(actix_web::http::Method::GET, "/product")
-        .set_cookie(actix_web::http::Method::GET, "/products");
+        .set_cookie(actix_web::http::Method::GET, "/products")
+        .set_cookie(actix_web::http::Method::GET, "/products/{product_id}");
 
         App::new()
             .app_data(Data::new(pool.clone()))
             .app_data(Data::new(config.clone())) // Add config to app data
             .app_data(Data::new(tera.clone()))   // Add Tera to app data
-            .wrap(csrf)
             .configure(routes::init) // Init routes
             .wrap(SessionMiddleware::new(
                 CookieSessionStore::default(),
                 secret_key.clone(),
             ))
+            .wrap(csrf)
             .wrap(middleware::Logger::default()) // Logger            
             .service(Files::new("/static", "./static").show_files_listing()) // Serve files from `static` directory
             // TODO: Make the static directory configurable 

@@ -1,23 +1,41 @@
+use diesel::{Queryable, Insertable};
+use crate::schema::product;
 use serde::{Serialize, Deserialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Queryable, Debug, Clone, Serialize, Deserialize)]
 pub struct Product {
-    pub id: Option<u32>,
+    pub id: i32,
     pub name: String,
-    pub price: f64,
-    pub inventory: u32,
-    pub category: String, // Singular
-    pub tags: Vec<String>, // up to 5?
-    pub keywords: Vec<String>, // For internal use
-    pub thumbnail_url: Option<String>, // Thumbnail image URL
-    pub gallery_urls: Vec<String>, // 0–3 gallery image URLs
-    pub tagline: String, // Short desc
-    pub description: Option<String>, // Longer HTML/text
-    pub discount_percent: Option<f64>, // [0.0, 100.0]
+    pub price: bigdecimal::BigDecimal,
+    pub inventory: i32,
+    pub category: String,
+    pub tags: Option<String>,
+    pub keywords: Option<String>,
+    pub thumbnail_url: Option<String>,
+    pub gallery_urls: Option<String>,
+    pub tagline: Option<String>,
+    pub description: Option<String>,
+    pub discount_percent: Option<f32>,
+}
+
+#[derive(Insertable, Debug, Clone, Serialize, Deserialize)]
+#[diesel(table_name = product)]
+pub struct NewProduct {
+    pub name: String,
+    pub price: bigdecimal::BigDecimal,
+    pub inventory: i32,
+    pub category: String,
+    pub tags: Option<String>,
+    pub keywords: Option<String>,
+    pub thumbnail_url: Option<String>,
+    pub gallery_urls: Option<String>,
+    pub tagline: Option<String>,
+    pub description: Option<String>,
+    pub discount_percent: Option<f32>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct CartItem {
-    pub product_id: u32,
+    pub product_id: i32,
     pub quantity: u32,
 }

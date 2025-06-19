@@ -6,6 +6,7 @@ use crate::config::Config;
 use crate::db::{DbPool, load_product_by_id};
 use crate::errors::BeedleError;
 use crate::session::create_base_context;
+use crate::views::ProductView;
 use serde::{Deserialize};
 
 #[derive(Deserialize)]
@@ -21,13 +22,15 @@ async fn product_detail(
     csrf_token: CsrfToken,
     session: Session
 ) -> Result<HttpResponse, BeedleError> {
-    let conn = pool.get()?;
-    let product = load_product_by_id(&conn, path.product_id)?;
+    let mut conn = pool.get()?;
+
+    let dbproduct = load_product_by_id(&mut conn, path.product_id)?;
+    let product = dbproduct.as_ref().map(ProductView::from);
 
     if let Some(product) = product {
         let mut ctx = create_base_context(&session, config.get_ref());
         ctx.insert("product", &product);
-        ctx.insert("csrf_token", &csrf_token);
+        ctx.insert("csrf_token", &csrf_token.get());
 
         let rendered = tera.render("product.html", &ctx)?;
         Ok(HttpResponse::Ok().content_type("text/html").body(rendered))

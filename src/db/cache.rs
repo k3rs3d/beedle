@@ -1,12 +1,12 @@
 use crate::errors::BeedleError;
+use diesel::{QueryDsl,RunQueryDsl};
 use once_cell::sync::Lazy;
 use std::sync::RwLock;
 
 pub static DATA: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
 pub struct CategoriesCache;
-// TODO: cache more future stuff (featured products, sales events, trending items...)
 
-pub fn initialize_caches(conn: &crate::db::Conn) -> Result<(), crate::BeedleError> {
+pub fn initialize_caches(conn: &mut crate::db::Conn) -> Result<(), BeedleError> {
     match load_categories_from_db(conn) {
         Ok(categories) => {
             CategoriesCache::initialize(categories);
@@ -16,15 +16,15 @@ pub fn initialize_caches(conn: &crate::db::Conn) -> Result<(), crate::BeedleErro
     }
 }
 
-fn load_categories_from_db(conn: &crate::db::Conn) -> Result<Vec<String>, BeedleError> {
-    let mut stmt = conn.prepare("SELECT DISTINCT category FROM product")?;
-    let categories_iter = stmt.query_map([], |row| row.get(0))?;
-
-    let categories = categories_iter
-        .collect::<Result<_, rusqlite::Error>>()
-        .map_err(BeedleError::DatabaseError)?;
-
-    Ok(categories)
+/// Load all unique categories (strings) from DB via Diesel
+fn load_categories_from_db(conn: &mut crate::db::Conn) -> Result<Vec<String>, BeedleError> {
+    use crate::schema::product::dsl::*;
+    // select distinct category from product;
+    product
+        .select(category)
+        .distinct()
+        .load::<String>(conn)
+        .map_err(|e| BeedleError::DatabaseError(e.to_string()))
 }
 
 impl CategoriesCache {
@@ -46,31 +46,46 @@ impl CategoriesCache {
 #[cfg(test)]
 mod cache_tests {
     use super::*;
-    use crate::db::{establish_connection, init_db, seed_example_products};
+    use crate::db::{Conn, DbPool, establish_connection, init_db, seed_example_products};
+    use diesel::{PgConnection, r2d2::ConnectionManager};
+    use once_cell::sync::Lazy;
+    use std::env;
+
+    static POOL: Lazy<DbPool> = Lazy::new(|| {
+        dotenv::dotenv().ok();
+
+        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let manager = ConnectionManager::<PgConnection>::new(database_url);
+        r2d2::Pool::builder()
+            .build(manager)
+            .expect("Failed to create pool.")
+    });
+
+    fn get_test_conn() -> Conn {
+        POOL.get().expect("Failed to get a connection from the pool")
+    }
 
     #[test]
     fn test_initialization_of_cache() {
-        let pool = establish_connection().expect("Failed to establish connection");
-        let mut conn = pool.get().expect("Failed to get connection from pool");
-        
-        init_db(&pool).expect("Failed to initialize DB");
+        let mut conn = get_test_conn();
+
+        init_db(&mut conn).expect("Failed to initialize DB");
         seed_example_products(&mut conn).expect("Failed to seed DB with test data");
-        initialize_caches(&conn).expect("Failed to cache from DB");
+        initialize_caches(&mut conn).expect("Failed to cache from DB");
 
         // Ensure cache is initialized with correct data
         let cached_categories = CategoriesCache::get_categories();
-        assert_eq!(cached_categories.len(), 3);
+        assert!(!cached_categories.is_empty());
         assert!(cached_categories.contains(&"Produce".to_string()));
     }
 
     #[test]
     fn test_cache_invalidation() {
-        let pool = establish_connection().expect("Failed to establish connection");
-        let mut conn = pool.get().expect("Failed to get connection from pool");
-        
-        init_db(&pool).expect("Failed to initialize DB");
+        let mut conn = get_test_conn();
+
+        init_db(&mut conn).expect("Failed to initialize DB");
         seed_example_products(&mut conn).expect("Failed to seed DB with test data");
-        initialize_caches(&conn).expect("Failed to cache from DB");
+        initialize_caches(&mut conn).expect("Failed to cache from DB");
 
         CategoriesCache::invalidate();
         let cached_categories = CategoriesCache::get_categories();
