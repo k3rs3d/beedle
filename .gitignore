@@ -1,5 +1,8 @@
 /target
 
+# Secrets
+*.env
+
 # Backup files created by editors
 *~
 *.swp
@@ -10,6 +13,7 @@
 .vs/
 
 # Database files
+.migrations/
 *.db
 
 *.txt
