@@ -32,7 +32,6 @@
                 {% endfor %}
             </p>
             {% endif %}
-            <p><b>Inventory:</b> {{ product.inventory }}</p>
             {% if product.gallery_urls and product.gallery_urls | length > 0 %}
             <div class="gallery">
                 {% for img in product.gallery_urls %}
@@ -49,7 +48,7 @@
         </div>
         <form action="/add_to_cart/" method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="hidden" name="product_id" value="{{ product.id }}">
+            <input type="hidden" name="product_id" value="{{ product.product_id }}">
             <input type="hidden" name="quantity" min="1" value="1">
             <button type="submit">Add to Cart</button>
         </form>
