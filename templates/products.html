@@ -2,6 +2,38 @@
 
 {% block content %}
 <h1>Products</h1>
+
+<form method="get" id="product-filter" action="/products" style="margin-bottom:2em;">
+    <label>
+        Category:
+        <select name="category">
+            <option value="">All</option>
+            {% for cat in categories %}
+                <option value="{{ cat }}"
+                    {% if request_args.category == cat %}selected{% endif %}
+                >{{ cat }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label>
+        Sort by:
+        <select name="sort">
+            <option value="">Newest</option>
+            <option value="alpha" {% if request_args.sort=="alpha" %}selected{% endif %}>Alphabetical</option>
+            <option value="price_low" {% if request_args.sort=="price_low" %}selected{% endif %}>Price: Low to High</option>
+            <option value="price_high" {% if request_args.sort=="price_high" %}selected{% endif %}>Price: High to Low</option>
+        </select>
+    </label>
+
+    <label>
+        Search:
+        <input type="text" name="search" placeholder="Search for an item..." value="{{ request_args.search }}">
+    </label>
+
+    <button type="submit">Apply</button>
+</form>
+
 <ul class="product-list">
     {% for product in products %}
     <li class="product-card">
@@ -65,19 +97,28 @@
 <center>
     <nav class="pagination">
         {% if current_page > 1 %}
-        <a href="/products?page={{ current_page - 1 }}">Previous</a>
+            {% if filter_query %}
+                <a href="/products?page={{ current_page - 1 }}">Previous</a>
+            {% else %}
+                <a href="/products?page={{ current_page - 1 }}&{{ filter_query }}">Previous</a>
+            {% endif %}
         {% endif %}
 
         {% for page_num in range(start=1, end=total_pages + 1) %}
-        {% if page_num == current_page %}
-        <span class="current">{{ page_num }}</span>
-        {% else %}
-        <a href="/products?page={{ page_num }}">{{ page_num }}</a>
-        {% endif %}
+            {% if filter_query %}
+                <a href="/products?page={{ page_num }}&{{ filter_query }}">{{ page_num }}</a>
+            {% else %}
+                <a href="/products?page={{ page_num }}">{{ page_num }}</a>
+            {% endif %}
         {% endfor %}
 
-        {% if current_page < total_pages %} <a href="/products?page={{ current_page + 1 }}">Next</a>
+        {% if current_page < total_pages %}
+            {% if filter_query %}
+                <a href="/products?page={{ current_page + 1 }}&{{ filter_query }}">Next</a>
+            {% else %}
+                <a href="/products?page={{ current_page + 1 }}">Next</a>
             {% endif %}
+        {% endif %}
     </nav>
 </center>
 {% endif %}

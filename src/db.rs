@@ -175,26 +175,36 @@ pub fn filter_products(
     let mut query = product.into_boxed();
 
     if let Some(cat) = category_opt {
-        query = query.filter(category.eq(cat));
+        let cat = cat.trim();
+        if !cat.is_empty() {
+            query = query.filter(category.eq(cat));
+        }
     }
     if let Some(tag_val) = tag_opt {
-        // WARNING: we search tags as a comma string, so LIKE is the best you can do without parsing!
+        // we search tags as a comma string right now, so like is the best without parsing
         query = query.filter(tags.like(format!("%{}%", tag_val)));
     }
-    // TODO: implement text search
-    /*
+
+    // Text search
     if let Some(search_str) = search_opt {
-        let like_expr = format!("%{}%", search_str);
-        query = query.filter(
-            name.like(&like_expr).or(tagline.like(&like_expr))
-        );
+        let s = search_str.trim();
+        if !s.is_empty() {
+            let like_expr = format!("%{}%", search_str);
+            query = query.filter(
+                name.ilike(like_expr.clone()).or(description.ilike(like_expr.clone())).or(tagline.ilike(like_expr))
+            );
+        }
     }
-    */
+
     // Sorting
     match sort_opt {
+        Some("alpha")       => query = query.order(name.asc()),
         Some("price_low") =>  query = query.order(price.asc()),
         Some("price_high") => query = query.order(price.desc()),
         _ =>                  query = query.order(price.desc()), // default
+        //Some("newest")      => query = query.order(id.desc()),
+        //Some("oldest")      => query = query.order(id.asc()),
+        //Some("rating")      => query = query.order(rating.desc()),
     }
     query
         .limit(limit_opt as i64)

@@ -1,9 +1,10 @@
 use actix_web::{web, HttpResponse};
 use actix_session::Session;
 use actix_csrf::extractor::CsrfToken;
+use std::collections::HashMap;
 use tera::Tera;
 use crate::config::Config;
-use crate::db::{DbPool,count_products,filter_products};
+use crate::db::{cache,DbPool,filter_products};
 use crate::errors::BeedleError;
 use crate::session::create_base_context;
 use crate::views::ProductView;
@@ -11,11 +12,21 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Deserialize, Serialize)]
 struct ListParams {
-    page: Option<usize>,
-    category: Option<String>,
-    tag: Option<String>,
-    search: Option<String>,
-    sort: Option<String>,
+    pub page: Option<usize>,
+    pub category: Option<String>,
+    pub tag: Option<String>,
+    pub search: Option<String>,
+    pub sort: Option<String>,
+}
+
+/// Build a query string from (key, value) pairs
+/// Example output: "category=Fruit&search=Apple"
+pub fn build_query_string(params: &HashMap<&str, String>) -> String {
+    params.iter()
+        .filter(|(_k, v)| !v.trim().is_empty())
+        .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v)))
+        .collect::<Vec<_>>()
+        .join("&")
 }
 
 async fn browse_products(
@@ -27,12 +38,10 @@ async fn browse_products(
     session: Session
 ) -> Result<HttpResponse, BeedleError> {
     let page = query.page.unwrap_or(1); // /products?page=N
-    let per_page = 2;
+    let per_page = 4;
     let offset = (page - 1) * per_page;
 
     let mut conn = pool.get()?;
-    let total_products = count_products(&mut conn)?;
-    let total_pages = (total_products as f64 / per_page as f64).ceil() as usize;
     let productlist = filter_products(
         &mut conn,
         query.category.as_deref(),
@@ -44,9 +53,36 @@ async fn browse_products(
     )?;
 
     let products: Vec<ProductView> = productlist.iter().map(ProductView::from).collect();
+    let total_pages = (productlist.len() as f64 / per_page as f64).ceil() as usize;
+    let categories = cache::CategoriesCache::get_categories().to_vec();
+
+    // build filter state
+    let mut params = HashMap::new();
+    if let Some(s) = query.category.as_ref().filter(|s| !s.trim().is_empty()) {
+        params.insert("category", s.clone());
+    }
+    if let Some(s) = query.sort.as_ref().filter(|s| !s.trim().is_empty()) {
+        params.insert("sort", s.clone());
+    }
+    if let Some(s) = query.search.as_ref().filter(|s| !s.trim().is_empty()) {
+        params.insert("search", s.clone());
+    }
+
+    let filter_query = build_query_string(&params);
+
+    // HACK
+    let request_args = serde_json::json!({
+    "category": query.category.clone().unwrap_or_default(),
+    "search": query.search.clone().unwrap_or_default(),
+    "sort": query.sort.clone().unwrap_or_default(),
+    });
 
     let mut ctx = create_base_context(&session, config.get_ref());
     ctx.insert("products", &products);
+    ctx.insert("categories", &categories);
+    ctx.insert("filter_query", &filter_query);
+    // TODO: also cache tags, add them here as well 
+    ctx.insert("request_args", &request_args);
     ctx.insert("current_page", &page);
     ctx.insert("total_pages", &total_pages);
     ctx.insert("csrf_token", &csrf_token.get());
