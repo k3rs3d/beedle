@@ -6,6 +6,7 @@
 # Backup files created by editors
 *~
 *.swp
+*.kate-swp
 
 # IDE files
 .idea/
