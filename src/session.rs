@@ -1,10 +1,93 @@
 use actix_session::Session;
-use crate::errors::BeedleError;
+use actix_web::{cookie::Cookie, HttpRequest, HttpResponse, web};
+use futures_util::future::{BoxFuture, FutureExt};
+use uuid::Uuid;
 use crate::models::CartItem;
-use crate::db::load_product_by_id;
+use crate::db::{DbPool};
+
+#[derive(Clone)]
+pub struct SessionInfo {
+    pub session_id: Uuid,
+    pub was_created: bool,
+    pub user_id: Option<i32>, // TODO: user accounts
+    pub cart: Vec<CartItem>,
+    pub ip_address: String, 
+    pub user_agent: String,
+}
+
+impl actix_web::FromRequest for SessionInfo {
+    type Error = actix_web::Error;
+    type Future = BoxFuture<'static, Result<Self, Self::Error>>;
+
+    fn from_request(req: &HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
+        let pool = match req.app_data::<web::Data<DbPool>>() {
+            Some(p) => p.clone(),
+            None => req.app_data::<web::Data<DbPool>>().expect("DB pool missing in app_data!").clone(), // should never happen 
+        };
+        // Gather cookie/session_id etc
+        let cookie_session_id = req.cookie("session_id").and_then(|c| Uuid::parse_str(c.value()).ok());
+        let ip = req.peer_addr().map(|addr| addr.ip().to_string()).unwrap_or_default();
+        let user_agent = req.headers().get("User-Agent")
+            .and_then(|v| v.to_str().ok()).unwrap_or_default().to_owned();
+        
+        log::info!("connection_info host: {:?}", req.connection_info().host());
+        log::info!("req.url: {:?}", req.uri());
+        for cookie in req.cookies().iter() {
+            log::info!("cookie: {:?}", cookie);
+}
+        
+        async move {
+            let mut conn = pool.get().map_err(|_| actix_web::error::ErrorInternalServerError("No DB connection"))?;
+            let mut was_created = false;
+            log::info!("Looking for session_id in cookie: {:?}", cookie_session_id);
+            let (session_id, row) = if let Some(sid) = cookie_session_id {
+                if let Some(row) = crate::db::session::find_session_by_id(&mut conn, sid)? {
+                    log::info!("Cart of find_session_by_id: {:?}", row.cart_data);
+                    (sid, row) // loaded from db; was_created remains false
+                } else {
+                    // Invalid or expired session: create new
+                    log::info!("Session invalid/expired. Creating new session.");
+                    let new_row = crate::db::session::create_new_session(&mut conn, &ip, &user_agent)?;
+                    was_created = true;
+                    (new_row.session_id, new_row)
+                }
+            } else {
+                // No cookie: create new session
+                log::info!("No cookie found. Creating new session.");
+                let new_row = crate::db::session::create_new_session(&mut conn, &ip, &user_agent)?;
+                was_created = true;
+                (new_row.session_id, new_row)
+            };
+            // Parse cart_data
+            let cart: Vec<crate::models::CartItem> = row.cart_data
+                .as_ref()
+                .and_then(|j| serde_json::from_value(j.clone()).ok())
+                .unwrap_or_default();
+            Ok(SessionInfo {
+                session_id,
+                was_created: was_created,
+                user_id: row.user_id,
+                cart,
+                ip_address: ip,
+                user_agent,
+            })
+        }.boxed()
+    }
+}
+
+pub fn ensure_session_cookie(mut res: HttpResponse, sid: Uuid) -> HttpResponse {
+    // .secure(true) for prod
+    let cookie = Cookie::build("session_id", sid.to_string())
+        .path("/")
+        .http_only(true)
+        .max_age(actix_web::cookie::time::Duration::days(7)) // If you want expiry
+        .finish();
+    res.add_cookie(&cookie).unwrap();
+    res
+}
 
 // A starter tera context with generic elements added 
-pub fn create_base_context(session:&Session, config: &crate::config::Config) -> tera::Context {
+pub fn create_base_context(session:&SessionInfo, config: &crate::config::Config) -> tera::Context {
     let mut ctx = tera::Context::new();
     ctx.insert("site_name", &config.site_name);
     ctx.insert("root_domain", &config.root_domain);
@@ -12,63 +95,18 @@ pub fn create_base_context(session:&Session, config: &crate::config::Config) -> 
     ctx
 }
  
-// Num items in cart
-pub fn get_cart_item_count(session: &Session) -> u32 {
-    get_cart(session).iter().map(|item| item.quantity).sum()
+// Num items in cart (kind of obsolete)
+pub fn get_cart_item_count(session: &SessionInfo) -> u32 {
+    session.cart.iter().map(|item| item.quantity).sum()
 }
 
 // Retrieve current cart from session
+// DEPRECATED 
 pub fn get_cart(session: &Session) -> Vec<CartItem> {
     match session.get::<Vec<CartItem>>("cart") {
         Ok(Some(cart)) => cart,
         _ => Vec::new(),
     }
-}
-
-// Increase/decrease quantity of item 
-pub fn update_cart_quantity(
-    session: &Session,
-    product_id: i32,
-    delta: i32,
-    conn: &mut crate::db::Conn,
-) -> Result<(), BeedleError> {
-    let mut cart = get_cart(session);
-    let product = load_product_by_id(conn, product_id)?.ok_or_else(|| {
-        BeedleError::InventoryError(format!("Product {} not found", product_id))
-    })?;
-
-    let max_per_order = 99; // HACK (arbitrary global max)
-    let max_allowed = product.inventory.min(max_per_order).min(99).max(1); // never allow more than the inventory amount OR per-customer limit 
-
-    if delta == 0 {
-        // Remove item if explicit set-to-zero
-        cart.retain(|item| item.product_id != product_id);
-    } else if delta > 0 {
-        let entry = cart.iter_mut().find(|item| item.product_id == product_id);
-        if let Some(item) = entry {
-            let new_qty = (item.quantity as i32 + delta).clamp(1, max_allowed);
-            item.quantity = new_qty as u32;
-        } else {
-            let start_qty = delta.clamp(1, max_allowed);
-            cart.push(CartItem {
-                product_id,
-                quantity: start_qty as u32,
-            });
-        }
-    } else {
-        // delta < 0; Decrement or Remove
-        if let Some(idx) = cart.iter().position(|item| item.product_id == product_id) {
-            let item = &mut cart[idx];
-            let new_qty = item.quantity as i32 + delta; // delta negative
-            if new_qty < 1 {
-                cart.remove(idx);
-            } else {
-                item.quantity = new_qty as u32;
-            }
-        }
-    }
-    session.insert("cart", &cart).unwrap();
-    Ok(())
 }
 
 

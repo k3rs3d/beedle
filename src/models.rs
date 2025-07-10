@@ -1,5 +1,5 @@
-use diesel::{Queryable, Insertable};
-use crate::schema::product;
+use diesel::{AsChangeset, Queryable, Insertable};
+use crate::schema::*;
 use serde::{Serialize, Deserialize};
 
 #[derive(Queryable, Debug, Clone, Serialize, Deserialize)]
@@ -34,8 +34,21 @@ pub struct NewProduct {
     pub discount_percent: Option<f32>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CartItem {
     pub product_id: i32,
     pub quantity: u32,
+}
+
+#[derive(Queryable, Insertable, AsChangeset)]
+#[diesel(table_name = session)]
+pub struct SessionRow {
+    pub session_id: uuid::Uuid,
+    pub user_id: Option<i32>,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
+    pub expires_at: chrono::NaiveDateTime,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub cart_data: Option<serde_json::Value>,
 }

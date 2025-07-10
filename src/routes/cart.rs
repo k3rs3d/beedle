@@ -1,12 +1,12 @@
-use actix_session::Session;
 use actix_web::{web, HttpResponse, http::header};
 use actix_csrf::extractor::{Csrf, CsrfToken, CsrfGuarded};
 use tera::Tera;
 use serde::Serialize;
-use crate::errors::BeedleError;
 use crate::config::Config;
 use crate::db::{DbPool, load_products};
-use crate::session::{get_cart, update_cart_quantity, create_base_context};
+use crate::errors::BeedleError;
+use crate::models::CartItem;
+use crate::session::{ensure_session_cookie, create_base_context, SessionInfo};
 
 #[derive(serde::Deserialize)]
 struct CartActionForm {
@@ -26,50 +26,74 @@ struct CartProductView {
     max_quantity: i32,
 }
 
-async fn add_to_cart(
-    pool: web::Data<DbPool>,
-    session: Session,
-    form: Csrf<web::Form<CartActionForm>>,
-) -> Result<HttpResponse, BeedleError> {
-    let mut conn = pool.get()?;
-    let form = form.into_inner().into_inner();
-    update_cart_quantity(&session, form.product_id, form.quantity, &mut conn)?;
-    Ok(HttpResponse::SeeOther().append_header((header::LOCATION, "/products")).finish())
+fn update_cart_quantity_for_sessioninfo(
+    cart: &mut Vec<CartItem>,
+    product_id: i32,
+    delta: i32,
+    max_allowed: i32,
+) {
+    if delta == 0 {
+        cart.retain(|item| item.product_id != product_id);
+    } else if delta > 0 {
+        let entry = cart.iter_mut().find(|item| item.product_id == product_id);
+        if let Some(item) = entry {
+            let new_qty = (item.quantity as i32 + delta).clamp(1, max_allowed);
+            item.quantity = new_qty as u32;
+        } else {
+            let start_qty = delta.clamp(1, max_allowed);
+            cart.push(CartItem { product_id, quantity: start_qty as u32 });
+        }
+    } else {
+        if let Some(idx) = cart.iter().position(|item| item.product_id == product_id) {
+            let item = &mut cart[idx];
+            let new_qty = item.quantity as i32 + delta;
+            if new_qty < 1 {
+                cart.remove(idx);
+            } else {
+                item.quantity = new_qty as u32;
+            }
+        }
+    }
 }
 
-async fn remove_from_cart(
-    pool: web::Data<DbPool>,
-    session: Session,
-    form: Csrf<web::Form<CartActionForm>>,
-) -> Result<HttpResponse, BeedleError> {
-    let mut conn = pool.get()?;
-    let form = form.into_inner().into_inner();
-    update_cart_quantity(&session, form.product_id, -1, &mut conn)?;
-    Ok(HttpResponse::SeeOther().append_header((header::LOCATION, "/cart")).finish())
-}
+
 
 async fn update_cart_quantity_handler(
     pool: web::Data<DbPool>,
-    session: Session,
+    mut session: SessionInfo,
     form: Csrf<web::Form<CartActionForm>>,
 ) -> Result<HttpResponse, BeedleError> {
     let mut conn = pool.get()?;
     let form = form.into_inner().into_inner();
-    // If quantity == 0, remove from cart
-    let delta = form.quantity;
-    update_cart_quantity(&session, form.product_id, delta, &mut conn)?;
-    Ok(HttpResponse::SeeOther().append_header((header::LOCATION, "/cart")).finish())
+    
+    // verify product exists and get actual allowable max
+    let product = crate::db::load_product_by_id(&mut conn, form.product_id)?
+        .ok_or_else(|| BeedleError::InventoryError("Product not found".into()))?;
+
+    let max_per_order = 99; // TODO: use product.max_per_order after I add that field 
+    let max_allowed = product.inventory.min(max_per_order);
+
+    update_cart_quantity_for_sessioninfo(&mut session.cart, form.product_id, form.quantity, max_allowed);
+
+    crate::db::session::update_session_cart(&mut conn, session.session_id, &session.cart)?;
+
+    let resp = HttpResponse::SeeOther().header(header::LOCATION, "/cart").finish();
+    if session.was_created {
+        Ok(ensure_session_cookie(resp, session.session_id))
+    } else {
+        Ok(resp)
+    }
 }
 
 async fn view_cart(
     pool: web::Data<DbPool>,
     tera: web::Data<Tera>,
     config: web::Data<Config>,
-    session: Session,
+    session: SessionInfo,
     csrf_token: CsrfToken,
 ) -> Result<HttpResponse, BeedleError> {
     let mut conn = pool.get()?;
-    let cart = get_cart(&session);
+    let cart = &session.cart;
     let products = load_products(&mut conn)?;
 
     let cart_items: Vec<CartProductView> = cart
@@ -98,8 +122,6 @@ async fn view_cart(
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg
-        .service(web::resource("/add_to_cart/").route(web::post().to(add_to_cart)))
-        .service(web::resource("/remove_from_cart/").route(web::post().to(remove_from_cart)))
         .service(web::resource("/update_cart_quantity/").route(web::post().to(update_cart_quantity_handler)))
         .service(web::resource("/cart").route(web::get().to(view_cart)));
 }

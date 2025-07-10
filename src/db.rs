@@ -2,7 +2,6 @@ use crate::db::cache::initialize_caches;
 use crate::errors::BeedleError;
 use crate::models::{CartItem, Product, NewProduct};
 use bigdecimal::FromPrimitive;
-use chrono::{NaiveDateTime};
 use r2d2::{Pool, PooledConnection};
 use diesel::{
     {ExpressionMethods,TextExpressionMethods,QueryDsl,RunQueryDsl},
@@ -14,6 +13,7 @@ pub type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type Conn = PooledConnection<ConnectionManager<PgConnection>>;
 
 pub mod cache;
+pub mod session;
 
 // DEBUG
 // Add fake example products to db
@@ -145,6 +145,7 @@ pub fn init_db(conn: &mut Conn) -> Result<(), BeedleError> {
 
 // PRODUCTS
 // Total product count
+/*
 pub fn count_products(conn: &mut Conn) -> Result<usize, BeedleError> {
     use crate::schema::product::dsl::*;
     product.count()
@@ -152,6 +153,7 @@ pub fn count_products(conn: &mut Conn) -> Result<usize, BeedleError> {
         .map(|n| n as usize)
         .map_err(|e| BeedleError::DatabaseError(e.to_string()))
 }
+*/
 
 pub fn load_products(conn: &mut Conn) -> Result<Vec<Product>, BeedleError> {
     use crate::schema::product::dsl::*;
@@ -288,6 +290,7 @@ pub fn update_inventory(conn: &mut Conn, cart: &[CartItem]) -> Result<(), Beedle
     }).map_err(|e| BeedleError::DatabaseError(e.to_string()))
 }
 
+/*
 // UNIT TESTING
 #[cfg(test)]
 mod tests {
@@ -316,7 +319,7 @@ fn test_count_products() {
     assert!(result.is_ok(), "Counting products failed");
     // Further checks could be made depending on the initial state of the database
 }
-/*
+
 #[test]
 fn test_load_product_by_id_existing() {
     let mut conn = get_test_conn();
@@ -337,5 +340,6 @@ fn test_load_product_by_id_non_existent() {
     let product = result.unwrap();
     assert!(product.is_none(), "Product with an invalid ID should not exist");
 }
-    */
+    
 }
+*/

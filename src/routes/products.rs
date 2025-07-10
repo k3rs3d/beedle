@@ -1,12 +1,11 @@
 use actix_web::{web, HttpResponse};
-use actix_session::Session;
 use actix_csrf::extractor::CsrfToken;
 use std::collections::HashMap;
 use tera::Tera;
 use crate::config::Config;
 use crate::db::{cache,DbPool,filter_products};
 use crate::errors::BeedleError;
-use crate::session::create_base_context;
+use crate::session::{create_base_context, ensure_session_cookie, SessionInfo};
 use crate::views::ProductView;
 use serde::{Serialize, Deserialize};
 
@@ -35,12 +34,12 @@ async fn browse_products(
     config: web::Data<Config>,
     query: web::Query<ListParams>,
     csrf_token: CsrfToken,
-    session: Session
+    session: SessionInfo
 ) -> Result<HttpResponse, BeedleError> {
     let page = query.page.unwrap_or(1); // /products?page=N
     let per_page = 4;
     let offset = (page - 1) * per_page;
-
+        
     let mut conn = pool.get()?;
     let productlist = filter_products(
         &mut conn,
@@ -88,7 +87,14 @@ async fn browse_products(
     ctx.insert("csrf_token", &csrf_token.get());
    
     let rendered = tera.render("products.html", &ctx)?;
-    Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
+    
+    let response = HttpResponse::Ok().content_type("text/html").body(rendered);
+
+    if session.was_created {
+        Ok(ensure_session_cookie(response, session.session_id))
+    } else {
+        Ok(response)
+    }
 }
 
 pub fn init(cfg: &mut web::ServiceConfig) {

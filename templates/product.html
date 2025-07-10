@@ -46,10 +46,10 @@
             </div>
             {% endif %}
         </div>
-        <form action="/add_to_cart/" method="post">
+        <form action="/update_cart_quantity/" method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="product_id" value="{{ product.product_id }}">
-            <input type="hidden" name="quantity" min="1" value="1">
+            <input type="hidden" name="quantity" value="1">
             <button type="submit">Add to Cart</button>
         </form>
 </div>

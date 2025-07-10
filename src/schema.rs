@@ -16,3 +16,21 @@ diesel::table! {
         discount_percent -> Nullable<Float4>,
     }
 }
+
+diesel::table! {
+    session (session_id) {
+        session_id -> Uuid,
+        user_id -> Nullable<Int4>,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+        expires_at -> Timestamp,
+        ip_address -> Nullable<Text>,
+        user_agent -> Nullable<Text>,
+        cart_data -> Nullable<Jsonb>,
+    }
+}
+
+diesel::allow_tables_to_appear_in_same_query!(
+    product,
+    session,
+);

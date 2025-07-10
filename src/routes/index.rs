@@ -1,15 +1,14 @@
 use actix_web::{web, HttpResponse};
-use actix_session::Session;
 use tera::Tera;
 use crate::config::Config;
 use crate::db::{cache};
 use crate::errors::BeedleError;
-use crate::session::create_base_context;
+use crate::session::{create_base_context, SessionInfo};
 
 async fn index(
     tera: web::Data<Tera>,
     config: web::Data<Config>,
-    session: Session
+    session: SessionInfo
 ) -> Result<HttpResponse, BeedleError> { 
     // Load front page information
     let categories = cache::CategoriesCache::get_categories().to_vec();

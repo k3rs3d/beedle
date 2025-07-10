@@ -1,11 +1,10 @@
 use actix_web::{web, HttpResponse};
-use actix_session::Session;
 use actix_csrf::extractor::CsrfToken;
 use tera::Tera;
 use crate::config::Config;
 use crate::db::{DbPool, load_product_by_id};
 use crate::errors::BeedleError;
-use crate::session::create_base_context;
+use crate::session::{create_base_context, SessionInfo};
 use crate::views::ProductView;
 use serde::{Deserialize};
 
@@ -20,7 +19,7 @@ async fn product_detail(
     config: web::Data<Config>,
     path: web::Path<ProductPath>,
     csrf_token: CsrfToken,
-    session: Session
+    session: SessionInfo
 ) -> Result<HttpResponse, BeedleError> {
     let mut conn = pool.get()?;
 

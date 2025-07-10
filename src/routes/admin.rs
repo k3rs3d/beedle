@@ -1,12 +1,11 @@
 use crate::config::Config;
-use crate::db::{delete_product, load_products, save_product, DbPool};
+use crate::db::{delete_product, load_products, DbPool};
 use crate::errors::BeedleError;
 use crate::models::NewProduct;
-use crate::session::create_base_context;
-use actix_session::Session;
+use crate::session::{create_base_context, SessionInfo};
 use actix_web::{web, HttpResponse};
 use diesel::RunQueryDsl;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize};
 use tera::Tera;
 
 #[derive(Debug,Deserialize)]
@@ -27,7 +26,7 @@ pub struct ProductForm {
 async fn list_products(
     pool: web::Data<DbPool>,
     tera: web::Data<Tera>,
-    session: Session,
+    session: SessionInfo,
     config: web::Data<Config>
 ) -> Result<HttpResponse, BeedleError> {
     let mut conn = pool.get()?;
@@ -43,7 +42,7 @@ async fn list_products(
 
 async fn add_product_form(
     tera: web::Data<Tera>,
-    session: Session,
+    session: SessionInfo,
     config: web::Data<Config>
 ) -> Result<HttpResponse, BeedleError> {
     let ctx = create_base_context(&session, config.get_ref());
