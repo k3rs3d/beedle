@@ -7,13 +7,32 @@
 {% else %}
     <ul>
     {% for item in cart_items %}
-        <li><a href="/products/{{ item.0.id }}">{{ item.0.name }}</a><br>Quantity: {{ item.1 }}</li>
-        <form action="/remove_from_cart/" method="post">
-            <input type="hidden" name="product_id" value="{{ item.0.id }}">
+    <li>
+        <form action="/update_cart_quantity/" method="post" style="display:inline">
+            <input type="hidden" name="product_id" value="{{ item.product.id }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="quantity" value="-1">
-            <button type="submit">Remove</button>
+            <button type="submit"
+                {% if item.quantity == 1 %}title="Remove"{% else %}title="Decrease"{% endif %}
+                {% if item.quantity == 1 %}class="remove-btn"{% else %}class="decrement-btn"{% endif %}
+                style="font-weight:bold;padding:0 8px">{% if item.quantity == 1 %}🗑{% else %}−{% endif %}
+            </button>
         </form>
+        <span style="display:inline-block;width:2em;text-align:center;">{{ item.quantity }}</span>
+        <form action="/update_cart_quantity/" method="post" style="display:inline">
+            <input type="hidden" name="product_id" value="{{ item.product.id }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="quantity" value="1">
+            <button type="submit"
+                {% if item.quantity >= item.max_quantity %}disabled{% endif %}
+                class="increment-btn"
+                style="font-weight:bold;padding:0 8px">+</button>
+        </form>
+        <a href="/products/{{ item.product.id }}">{{ item.product.name }}</a>
+        {% if item.product.tagline %}
+            <i>{{ item.product.tagline | truncate(length=32) }}</i>
+        {% endif %}
+    </li>
     {% endfor %}
     </ul>
     <form action="/checkout" method="post">
