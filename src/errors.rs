@@ -22,6 +22,9 @@ pub enum BeedleError {
     
     #[error("Configuration error: {0}")]
     ConfigError(String),
+
+    #[error("Session error: {0}")]
+    SessionError(String),
     
     #[error("Inventory error: {0}")]
     InventoryError(String),
@@ -46,6 +49,7 @@ impl ResponseError for BeedleError {
             BeedleError::TemplateError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             BeedleError::HttpError(_) => StatusCode::BAD_GATEWAY,
             BeedleError::ConfigError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            BeedleError::SessionError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             BeedleError::InventoryError(_) => StatusCode::BAD_REQUEST,
             BeedleError::IOError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             BeedleError::ResponseError(_) => StatusCode::TOO_MANY_REQUESTS, // ????
