@@ -7,6 +7,12 @@ use std::io;
 pub enum BeedleError {
     #[error("Database error: {0}")]
     DatabaseError(String),
+
+    #[error("Diesel error: {0}")]
+    DieselError(#[from] diesel::result::Error),
+
+    #[error("Serde JSON error: {0}")]
+    SerdeJsonError(#[from] serde_json::Error),
     
     #[error("Template error: {0}")]
     TemplateError(#[from] tera::Error),
@@ -35,6 +41,8 @@ impl ResponseError for BeedleError {
     fn status_code(&self) -> StatusCode {
         match *self {
             BeedleError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            BeedleError::DieselError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            BeedleError::SerdeJsonError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             BeedleError::TemplateError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             BeedleError::HttpError(_) => StatusCode::BAD_GATEWAY,
             BeedleError::ConfigError(_) => StatusCode::INTERNAL_SERVER_ERROR,
