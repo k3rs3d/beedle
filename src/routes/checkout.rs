@@ -1,6 +1,6 @@
 use actix_session::Session;
 use actix_web::{web, HttpResponse};
-use crate::db::{DbPool, update_inventory};
+use crate::db::{DbPool, products::update_inventory};
 use crate::pay::process_payment;
 use crate::session::get_cart;
 use crate::errors::BeedleError;

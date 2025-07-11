@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse};
 use actix_csrf::extractor::CsrfToken;
 use tera::Tera;
 use crate::config::Config;
-use crate::db::{DbPool, load_product_by_id};
+use crate::db::{DbPool, products::load_product_by_id};
 use crate::errors::BeedleError;
 use crate::session::{create_base_context, SessionInfo};
 use crate::views::ProductView;

@@ -3,7 +3,7 @@ use actix_csrf::extractor::CsrfToken;
 use std::collections::HashMap;
 use tera::Tera;
 use crate::config::Config;
-use crate::db::{cache,DbPool,filter_products};
+use crate::db::{cache,DbPool,products::filter_products};
 use crate::errors::BeedleError;
 use crate::session::{create_base_context, ensure_session_cookie, SessionInfo};
 use crate::views::ProductView;

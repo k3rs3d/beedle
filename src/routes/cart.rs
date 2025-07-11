@@ -3,7 +3,7 @@ use actix_csrf::extractor::{Csrf, CsrfToken, CsrfGuarded};
 use tera::Tera;
 use serde::Serialize;
 use crate::config::Config;
-use crate::db::{DbPool, load_products};
+use crate::db::{DbPool, products};
 use crate::errors::BeedleError;
 use crate::models::CartItem;
 use crate::session::{ensure_session_cookie, create_base_context, SessionInfo};
@@ -67,7 +67,7 @@ async fn update_cart_quantity_handler(
     let form = form.into_inner().into_inner();
     
     // verify product exists and get actual allowable max
-    let product = crate::db::load_product_by_id(&mut conn, form.product_id)?
+    let product = products::load_product_by_id(&mut conn, form.product_id)?
         .ok_or_else(|| BeedleError::InventoryError("Product not found".into()))?;
 
     let max_per_order = 99; // TODO: use product.max_per_order after I add that field 
@@ -94,7 +94,7 @@ async fn view_cart(
 ) -> Result<HttpResponse, BeedleError> {
     let mut conn = pool.get()?;
     let cart = &session.cart;
-    let products = load_products(&mut conn)?;
+    let products = products::load_products(&mut conn)?;
 
     let cart_items: Vec<CartProductView> = cart
         .into_iter()

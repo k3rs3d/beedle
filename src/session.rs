@@ -1,9 +1,13 @@
+//! HTTP session extraction and session cookie logic using a
+//! backend database session via `db::sessions`.  
+//! Provides `SessionInfo` type. 
+
 use actix_session::Session;
 use actix_web::{cookie::Cookie, HttpRequest, HttpResponse, web};
 use futures_util::future::{BoxFuture, FutureExt};
 use uuid::Uuid;
 use crate::models::CartItem;
-use crate::db::{DbPool};
+use crate::db::{DbPool, session::*};
 
 #[derive(Clone)]
 pub struct SessionInfo {
@@ -19,70 +23,94 @@ impl actix_web::FromRequest for SessionInfo {
     type Error = actix_web::Error;
     type Future = BoxFuture<'static, Result<Self, Self::Error>>;
 
+    /// Try to extract session info from the HTTP request.
+    /// - Looks for a "session_id" cookie.
+    /// - Loads the session from DB if found/valid.
+    /// - Otherwise, creates a new session row in DB and sets a flag.
     fn from_request(req: &HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
-        let pool = match req.app_data::<web::Data<DbPool>>() {
-            Some(p) => p.clone(),
-            None => req.app_data::<web::Data<DbPool>>().expect("DB pool missing in app_data!").clone(), // should never happen 
-        };
-        // Gather cookie/session_id etc
+        // Get DB pool (should always be present)
+        let pool = req
+            .app_data::<web::Data<DbPool>>()
+            .expect("DB pool missing in app_data!")
+            .clone();
+
+        // Extract relevant info for session association
         let cookie_session_id = req.cookie("session_id").and_then(|c| Uuid::parse_str(c.value()).ok());
         let ip = req.peer_addr().map(|addr| addr.ip().to_string()).unwrap_or_default();
-        let user_agent = req.headers().get("User-Agent")
-            .and_then(|v| v.to_str().ok()).unwrap_or_default().to_owned();
-        
-        log::info!("connection_info host: {:?}", req.connection_info().host());
-        log::info!("req.url: {:?}", req.uri());
-        for cookie in req.cookies().iter() {
-            log::info!("cookie: {:?}", cookie);
-}
-        
+        let user_agent = req.headers()
+            .get("User-Agent")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_owned();
+
+        // Log basic info
+        let cookie_names: Vec<_> = match req.cookies().as_ref() {
+            Ok(cookies) => cookies.iter().map(|c| c.name().to_string()).collect(),
+            Err(_) => vec![],
+        };
+        log::debug!("Request at {:?} from {:?}, cookies: {:?}", req.uri(), ip, cookie_names);
+
         async move {
-            let mut conn = pool.get().map_err(|_| actix_web::error::ErrorInternalServerError("No DB connection"))?;
+            let mut conn = pool.get()
+                .map_err(|_| actix_web::error::ErrorInternalServerError("No DB connection"))?;
             let mut was_created = false;
-            log::info!("Looking for session_id in cookie: {:?}", cookie_session_id);
-            let (session_id, row) = if let Some(sid) = cookie_session_id {
-                if let Some(row) = crate::db::session::find_session_by_id(&mut conn, sid)? {
-                    log::info!("Cart of find_session_by_id: {:?}", row.cart_data);
-                    (sid, row) // loaded from db; was_created remains false
-                } else {
-                    // Invalid or expired session: create new
-                    log::info!("Session invalid/expired. Creating new session.");
-                    let new_row = crate::db::session::create_new_session(&mut conn, &ip, &user_agent)?;
+
+            // try existing session, or create if missing/expired.
+            let (session_id, row) = match cookie_session_id {
+                Some(sid) => match find_session_by_id(&mut conn, sid) {
+                    Ok(Some(row)) => {
+                        log::debug!("Found active session in DB for {:?}", sid);
+                        (sid, row)
+                    }
+                    Ok(None) | Err(_) => {
+                        log::info!("Session {:?} not found/expired/bad. Making new session.", sid);
+                        let row = create_new_session(&mut conn, &ip, &user_agent)
+                            .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Session create failed: {e}")))?;
+                        was_created = true;
+                        (row.session_id, row)
+                    }
+                },
+                None => {
+                    log::info!("No session_id cookie. Creating new session for ip={}", ip);
+                    let row = create_new_session(&mut conn, &ip, &user_agent)
+                        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Session create failed: {e}")))?;
                     was_created = true;
-                    (new_row.session_id, new_row)
+                    (row.session_id, row)
                 }
-            } else {
-                // No cookie: create new session
-                log::info!("No cookie found. Creating new session.");
-                let new_row = crate::db::session::create_new_session(&mut conn, &ip, &user_agent)?;
-                was_created = true;
-                (new_row.session_id, new_row)
             };
-            // Parse cart_data
-            let cart: Vec<crate::models::CartItem> = row.cart_data
+            // parse cart from JSON (can never panic)
+            let cart: Vec<CartItem> = row.cart_data
                 .as_ref()
                 .and_then(|j| serde_json::from_value(j.clone()).ok())
                 .unwrap_or_default();
+
             Ok(SessionInfo {
                 session_id,
-                was_created: was_created,
+                was_created,
                 user_id: row.user_id,
                 cart,
                 ip_address: ip,
                 user_agent,
             })
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
+
+/// Sets session_id cookie for client on outgoing response
 pub fn ensure_session_cookie(mut res: HttpResponse, sid: Uuid) -> HttpResponse {
-    // .secure(true) for prod
+    // .secure(true) should be enabled in production (HTTPS).
     let cookie = Cookie::build("session_id", sid.to_string())
         .path("/")
         .http_only(true)
-        .max_age(actix_web::cookie::time::Duration::days(7)) // If you want expiry
+        .max_age(actix_web::cookie::time::Duration::days(7))
+        // .secure(true) // prod only
         .finish();
-    res.add_cookie(&cookie).unwrap();
+
+    if let Err(e) = res.add_cookie(&cookie) {
+        log::error!("Adding session_id cookie failed: {e}");
+    }
     res
 }
 

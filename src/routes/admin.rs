@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::db::{delete_product, load_products, DbPool};
+use crate::db::{products, DbPool};
 use crate::errors::BeedleError;
 use crate::models::NewProduct;
 use crate::session::{create_base_context, SessionInfo};
@@ -30,7 +30,7 @@ async fn list_products(
     config: web::Data<Config>
 ) -> Result<HttpResponse, BeedleError> {
     let mut conn = pool.get()?;
-    let products = load_products(&mut conn)?;
+    let products = products::load_products(&mut conn)?;
 
     let mut ctx = create_base_context(&session, config.get_ref());
     ctx.insert("products", &products);
@@ -107,7 +107,7 @@ async fn remove_product(
     );
     let mut conn = pool.get()?;
 
-    if let Err(e) = delete_product(&mut conn, product_id) {
+    if let Err(e) = products::delete_product(&mut conn, product_id) {
         log::error!("Failed to delete product: {:?}", e);
         return Err(e);
     } else {
