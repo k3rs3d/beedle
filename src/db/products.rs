@@ -1,35 +1,32 @@
+//! Product database helpers: loading, CRUD, inventory adjustment, etc.
+
 use crate::errors::BeedleError;
-use crate::models::{CartItem, Product, NewProduct};
-use r2d2::PooledConnection;
+use crate::models::{CartItem, NewProduct, Product};
+use crate::schema::product::dsl::*;
 use diesel::{
-    {ExpressionMethods,TextExpressionMethods,QueryDsl,RunQueryDsl},
-    r2d2::{self, ConnectionManager},
-    pg::PgConnection,
-    prelude::*
+    prelude::*,
+    {ExpressionMethods, QueryDsl, RunQueryDsl, TextExpressionMethods},
 };
+
 use super::Conn;
 
-// PRODUCTS
-// Total product count
-/*
-pub fn count_products(conn: &mut Conn) -> Result<usize, BeedleError> {
-    use crate::schema::product::dsl::*;
-    product.count()
-        .get_result::<i64>(conn)
-        .map(|n| n as usize)
-        .map_err(|e| BeedleError::DatabaseError(e.to_string()))
-}
-*/
-
+/// Load all products, ordered by ID ascending.
 pub fn load_products(conn: &mut Conn) -> Result<Vec<Product>, BeedleError> {
-    use crate::schema::product::dsl::*;
-    product
-        .order(id.asc())
-        .load::<Product>(conn)
-        .map_err(|e| BeedleError::DatabaseError(e.to_string()))
+    product.order(id.asc()).load::<Product>(conn).map_err(|e| {
+        log::error!("Loading all products failed: {e}");
+        BeedleError::DatabaseError(e.to_string())
+    })
 }
 
-// Complex filter using Diesel query builder
+/// Filter and page products by category/tag/search/sort.
+/// Accepts optional filters and paginates with limit/offset.
+///
+/// # Parameters
+/// * `category_opt` - Optional category filter
+/// * `tag_opt` - Optional tag filter
+/// * `search_opt` - Optional substring/full-text search
+/// * `sort_opt` - Optional sort order ("alpha", "price_low", etc)
+/// * `limit_opt`, `offset_opt` - Pagination controls
 pub fn filter_products(
     conn: &mut Conn,
     category_opt: Option<&str>,
@@ -39,59 +36,61 @@ pub fn filter_products(
     limit_opt: usize,
     offset_opt: usize,
 ) -> Result<Vec<Product>, BeedleError> {
-    use crate::schema::product::dsl::*;
     let mut query = product.into_boxed();
 
-    if let Some(cat) = category_opt {
-        let cat = cat.trim();
-        if !cat.is_empty() {
-            query = query.filter(category.eq(cat));
-        }
+    if let Some(cat) = category_opt.filter(|c| !c.trim().is_empty()) {
+        query = query.filter(category.eq(cat));
     }
-    if let Some(tag_val) = tag_opt {
-        // we search tags as a comma string right now, so like is the best without parsing
+
+    if let Some(tag_val) = tag_opt.filter(|t| !t.trim().is_empty()) {
         query = query.filter(tags.like(format!("%{}%", tag_val)));
     }
 
-    // Text search
-    if let Some(search_str) = search_opt {
-        let s = search_str.trim();
-        if !s.is_empty() {
-            let like_expr = format!("%{}%", search_str);
-            query = query.filter(
-                name.ilike(like_expr.clone()).or(description.ilike(like_expr.clone())).or(tagline.ilike(like_expr))
-            );
-        }
+    // Text search 
+    let like_expr = search_opt
+        .filter(|s| !s.trim().is_empty())
+        .map(|search_str| format!("%{}%", search_str));
+    if let Some(ref like_expr) = like_expr {
+        query = query.filter(
+            name.ilike(like_expr.clone())
+                .or(description.ilike(like_expr.clone()))
+                .or(tagline.ilike(like_expr.clone()))
+        );
     }
 
     // Sorting
-    match sort_opt {
-        Some("alpha")       => query = query.order(name.asc()),
-        Some("price_low") =>  query = query.order(price.asc()),
-        Some("price_high") => query = query.order(price.desc()),
-        _ =>                  query = query.order(price.desc()), // default
-        //Some("newest")      => query = query.order(id.desc()),
-        //Some("oldest")      => query = query.order(id.asc()),
-        //Some("rating")      => query = query.order(rating.desc()),
-    }
+    query = match sort_opt {
+        Some("alpha") => query.order(name.asc()),
+        Some("price_low") => query.order(price.asc()),
+        Some("price_high") => query.order(price.desc()),
+        _ => query.order(price.asc()), // default sort, TODO: make default sort configurable?
+    };
+
     query
         .limit(limit_opt as i64)
         .offset(offset_opt as i64)
         .load::<Product>(conn)
-        .map_err(|e| BeedleError::DatabaseError(e.to_string()))
+        .map_err(|e| {
+            log::error!("Filtering products failed: {e}");
+            BeedleError::DatabaseError(e.to_string())
+        })
 }
 
+/// Find a product by its ID. Returns Ok(None) if not found.
 pub fn load_product_by_id(conn: &mut Conn, product_id_val: i32) -> Result<Option<Product>, BeedleError> {
-    use crate::schema::product::dsl::*;
     product
         .filter(id.eq(product_id_val))
         .first::<Product>(conn)
         .optional()
-        .map_err(|e| BeedleError::DatabaseError(e.to_string()))
+        .map_err(|e| {
+            log::error!("Loading product id {} failed: {e}", product_id_val);
+            BeedleError::DatabaseError(e.to_string())
+        })
 }
 
+/// Update/save an existing product. Returns error if product ID not found or update fails.
+/// Used for admin/product-edit (not needed for cart/browse).
 pub fn save_product(conn: &mut Conn, product_in: &Product) -> Result<(), BeedleError> {
-    use crate::schema::product::dsl::*;
     let updated_rows = diesel::update(product.filter(id.eq(product_in.id)))
         .set((
             name.eq(&product_in.name),
@@ -107,51 +106,69 @@ pub fn save_product(conn: &mut Conn, product_in: &Product) -> Result<(), BeedleE
             discount_percent.eq(&product_in.discount_percent),
         ))
         .execute(conn)
-        .map_err(|e| BeedleError::DatabaseError(e.to_string()))?;
+        .map_err(|e| {
+            log::error!("Failed to update product {}: {e}", product_in.id);
+            BeedleError::DatabaseError(e.to_string())
+        })?;
     if updated_rows == 0 {
-        Err(BeedleError::DatabaseError("No rows updated".into()))
+        Err(BeedleError::DatabaseError("No product rows updated (id not found)".to_string()))
     } else {
+        log::info!("Product {} updated", product_in.id);
         Ok(())
     }
 }
 
+/// Create a new product and returns it.
 pub fn insert_product(conn: &mut Conn, new_product: &NewProduct) -> Result<Product, BeedleError> {
-    use crate::schema::product::dsl::*;
     diesel::insert_into(product)
         .values(new_product)
         .get_result(conn)
-        .map_err(|e| BeedleError::DatabaseError(e.to_string()))
+        .map_err(|e| {
+            log::error!("Insert product failed: {e}");
+            BeedleError::DatabaseError(e.to_string())
+        })
 }
 
+/// Remove a product by ID.
+/// Returns error if the product does not exist.
 pub fn delete_product(conn: &mut Conn, product_id_val: i32) -> Result<(), BeedleError> {
     use crate::schema::product::dsl::*;
     let affected = diesel::delete(product.filter(id.eq(product_id_val)))
         .execute(conn)
-        .map_err(|e| BeedleError::DatabaseError(e.to_string()))?;
+        .map_err(|e| {
+            log::error!("Delete failed for product {}: {e}", product_id_val);
+            BeedleError::DatabaseError(e.to_string())
+        })?;
     if affected == 0 {
         Err(BeedleError::DatabaseError(format!("No product with id {}", product_id_val)))
     } else {
+        log::info!("Deleted product id {}", product_id_val);
         Ok(())
     }
 }
 
-// Inventory update sample: (update stock after order)
-// This function now uses Diesel transactions.
+/// Atomically decrement inventory for all cart items. Rolls back if any product would go negative inventory.
 pub fn update_inventory(conn: &mut Conn, cart: &[CartItem]) -> Result<(), BeedleError> {
     use crate::schema::product::dsl::*;
     conn.transaction::<_, diesel::result::Error, _>(|conn| {
         for item in cart {
-            // Get product for this ID
-            let prod = product.filter(id.eq(item.product_id as i32)).first::<Product>(conn)?;
+            let prod = product.filter(id.eq(item.product_id)).first::<Product>(conn)?;
             if prod.inventory >= item.quantity as i32 {
                 let new_inv = prod.inventory - item.quantity as i32;
-                diesel::update(product.filter(id.eq(item.product_id as i32)))
+                diesel::update(product.filter(id.eq(item.product_id)))
                     .set(inventory.eq(new_inv))
                     .execute(conn)?;
             } else {
-                return Err(diesel::result::Error::RollbackTransaction) // abort
+                log::warn!("Attempted to purchase more than inventory for product id {}: wanted {}, in stock {}", 
+                    item.product_id, item.quantity, prod.inventory);
+                // Abort transaction!
+                return Err(diesel::result::Error::RollbackTransaction);
             }
         }
         Ok(())
-    }).map_err(|e| BeedleError::DatabaseError(e.to_string()))
+    })
+    .map_err(|e| {
+        log::error!("Inventory update failed (rollback): {e}");
+        BeedleError::DatabaseError(e.to_string())
+    })
 }
