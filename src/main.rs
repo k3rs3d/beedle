@@ -1,78 +1,123 @@
-use actix_web::{middleware, App, cookie::Key, HttpServer, web::Data};
-use actix_session::{SessionMiddleware, storage::CookieSessionStore};
+//! `main.rs` - Application entrypoint. Sets up logging, configuration, DB, routes, and runs Actix server.
+
 use actix_csrf::CsrfMiddleware;
 use actix_files::Files;
-use dotenv::dotenv;
-use std::env;
+use actix_session::{storage::CookieSessionStore, SessionMiddleware};
+use actix_web::{cookie::Key, middleware, web::Data, App, HttpServer};
 use tera::Tera;
 
 mod config;
-mod db; mod schema;
-//mod email;
+mod db;
 mod errors;
 mod models;
 mod pay;
 mod routes;
+mod schema;
 mod session;
 mod views;
 
-use errors::BeedleError;
+use crate::errors::BeedleError;
 
 fn init_environment() {
-    dotenv().ok();
+    dotenv::dotenv().ok();
+    std::env::set_var("RUST_LOG", "info");
+    env_logger::init();
 }
 
-fn get_secret_key() -> Key {
-    let key_hex = env::var("SESSION_KEY").expect("SESSION_KEY must be set in .env!");
-    let key_bytes = hex::decode(key_hex).expect("SESSION_KEY must be valid hex");
-    Key::derive_from(&key_bytes)
+/// Loads secret key for cookies/sessions from env or fails clearly.
+fn get_secret_key() -> Result<Key, BeedleError> {
+    let key_hex = std::env::var("SESSION_KEY")
+        .map_err(|e| BeedleError::ConfigError(format!("SESSION_KEY is missing: {e}")))?;
+    let key_bytes = hex::decode(key_hex)
+        .map_err(|e| BeedleError::ConfigError(format!("SESSION_KEY isn't valid hex: {e}")))?;
+    Ok(Key::derive_from(&key_bytes))
+}
+
+/// Loads and validates global configuration (JSON + env vars).
+fn load_config() -> Result<config::Config, BeedleError> {
+    config::Config::from_file("config.json").map_err(|e| BeedleError::ConfigError(e.to_string()))
+}
+
+fn load_tera_templates() -> Result<Tera, BeedleError> {
+    Tera::new(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"))
+        .map_err(|e| BeedleError::ConfigError(format!("Template load failed: {e}")))
+}
+
+/// Returns a tuple (host, port) as strings (filled from env or defaults).
+fn get_server_bind() -> (String, String) {
+    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_owned());
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_owned());
+    (host, port)
+}
+
+/// Everything needed for setting up (or recovering) the database.
+fn setup_database() -> Result<db::DbPool, BeedleError> {
+    let pool = db::establish_connection()?;
+    let mut conn = pool
+        .get()
+        .map_err(|_| BeedleError::DatabaseError("Pool get failed".into()))?;
+    db::init_db(&mut conn)?;
+    Ok(pool)
 }
 
 #[actix_web::main]
 async fn main() -> Result<(), BeedleError> {
     init_environment();
 
-    std::env::set_var("RUST_LOG", "info");
-    env_logger::init();
+    let config = load_config()?;
+    let tera = load_tera_templates()?;
+    let secret_key = get_secret_key()?;
+    let (host, port) = get_server_bind();
 
-    // Load config settings 
-    let config = config::Config::from_file("config.json").map_err(|e| errors::BeedleError::ConfigError(e.to_string()))?;
+    // arc so threads/tasks dont have to think about ownership/lifetime
+    let config = async_std::sync::Arc::new(config);
 
-    // TODO: Make these configurable via config file?
-    let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    log::info!("Starting on http://{}:{}", host, port);
 
-    let secret_key = get_secret_key();
-    let tera = Tera::new(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"))?;
+    let pool = setup_database()?;
 
-    // Establish connection and initialize the database
-    let pool = crate::db::establish_connection().expect("Failed to create pool.");
-    let mut conn = pool.get().unwrap();
-    // Initialize database
-    crate::db::init_db(&mut conn).expect("Failed to initialize database.");
-
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         let csrf = CsrfMiddleware::with_rng(rand::rngs::OsRng)
-        .set_cookie(actix_web::http::Method::GET, "/cart")
-        .set_cookie(actix_web::http::Method::GET, "/products")
-        .set_cookie(actix_web::http::Method::GET, "/products/{product_id}");
+            .set_cookie(actix_web::http::Method::GET, "/cart")
+            .set_cookie(actix_web::http::Method::GET, "/products")
+            .set_cookie(actix_web::http::Method::GET, "/products/{product_id}");
 
         App::new()
             .app_data(Data::new(pool.clone()))
-            .app_data(Data::new(config.clone())) // Add config to app data
-            .app_data(Data::new(tera.clone()))   // Add Tera to app data
-            .configure(routes::init) // Init routes
+            .app_data(Data::new(config.clone()))
+            .app_data(Data::new(tera.clone()))
+            .configure(routes::init)
             .wrap(SessionMiddleware::new(
                 CookieSessionStore::default(),
                 secret_key.clone(),
             ))
             .wrap(csrf)
-            .wrap(middleware::Logger::default()) // Logger            
-            .service(Files::new("/static", "./static").show_files_listing()) // Serve files from `static` directory
-            // TODO: Make the static directory configurable 
+            .wrap(middleware::Logger::default())
+            .service(Files::new("/static", "./static").show_files_listing())
     })
-    .bind(format!("{}:{}", host, port)).map_err(BeedleError::from)?
-    .run()
-    .await.map_err(BeedleError::from)?;
+    .bind(format!("{}:{}", host, port))
+    .map_err(BeedleError::from)?
+    .run();
+
+    // Graceful shutdown 
+    let shutdown_signal = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to listen for shutdown signal");
+        log::warn!("Received Ctrl-C or SIGTERM, shutting down...");
+    };
+    tokio::select! {
+        res = server => {
+            if let Err(e) = res {
+                log::error!("HttpServer exited with error: {e}");
+                return Err(BeedleError::from(e));
+            }
+        }
+        _ = shutdown_signal => {
+            // call .stop() to expedite
+            log::info!("Actix server shutting down gracefully.");
+        }
+    }
+
     Ok(())
 }
