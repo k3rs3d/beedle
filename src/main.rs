@@ -3,7 +3,7 @@
 use actix_csrf::CsrfMiddleware;
 use actix_files::Files;
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-use actix_web::{cookie::Key, middleware, web::Data, App, HttpServer};
+use actix_web::{cookie::Key, middleware, web::to, web::Data, App, HttpServer};
 use tera::Tera;
 
 mod config;
@@ -87,6 +87,9 @@ async fn main() -> Result<(), BeedleError> {
             .app_data(Data::new(config.clone()))
             .app_data(Data::new(tera.clone()))
             .configure(routes::init)
+            .default_service(
+            to(crate::routes::not_found_handler)
+            )
             .wrap(SessionMiddleware::new(
                 CookieSessionStore::default(),
                 secret_key.clone(),
