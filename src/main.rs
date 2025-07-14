@@ -20,7 +20,7 @@ use crate::errors::BeedleError;
 
 fn init_environment() {
     dotenv::dotenv().ok();
-    std::env::set_var("RUST_LOG", "info");
+    std::env::set_var("RUST_LOG", "debug");
     env_logger::init();
 }
 
@@ -68,9 +68,6 @@ async fn main() -> Result<(), BeedleError> {
     let tera = load_tera_templates()?;
     let secret_key = get_secret_key()?;
     let (host, port) = get_server_bind();
-
-    // arc so threads/tasks dont have to think about ownership/lifetime
-    let config = async_std::sync::Arc::new(config);
 
     log::info!("Starting on http://{}:{}", host, port);
 
