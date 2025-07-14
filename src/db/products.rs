@@ -76,6 +76,37 @@ pub fn filter_products(
         })
 }
 
+/// Counts total number of products matching the given filters.
+pub fn count_filtered_products(
+    conn: &mut Conn,
+    category_opt: Option<&str>,
+    tag_opt: Option<&str>,
+    search_opt: Option<&str>,
+) -> Result<i64, BeedleError> {
+    use crate::schema::product::dsl::*;
+    let mut query = product.into_boxed();
+
+    if let Some(cat) = category_opt.filter(|s| !s.trim().is_empty()) {
+        query = query.filter(category.eq(cat));
+    }
+    if let Some(tag_val) = tag_opt.filter(|s| !s.trim().is_empty()) {
+        query = query.filter(tags.like(format!("%{}%", tag_val)));
+    }
+    if let Some(search_str) = search_opt.filter(|s| !s.trim().is_empty()) {
+        let like_expr = format!("%{}%", search_str);
+        query = query.filter(
+            name.ilike(like_expr.clone())
+                .or(description.ilike(like_expr.clone()))
+                .or(tagline.ilike(like_expr.clone())),
+        );
+    }
+
+    query.count().get_result(conn).map_err(|e| {
+        log::error!("Product count with filter failed: {}", e);
+        BeedleError::DatabaseError(e.to_string())
+    })
+}
+
 /// Find a product by its ID. Returns Ok(None) if not found.
 pub fn load_product_by_id(conn: &mut Conn, product_id_val: i32) -> Result<Option<Product>, BeedleError> {
     product
