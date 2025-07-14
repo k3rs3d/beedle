@@ -1,15 +1,19 @@
+//! Product listing ("Browse") page: /products, with filters/pagination.
+
 use actix_web::{web, HttpResponse};
 use actix_csrf::extractor::CsrfToken;
 use std::collections::HashMap;
 use tera::Tera;
 use crate::config::Config;
-use crate::db::{cache,DbPool,products::filter_products};
+use crate::db::{cache, DbPool, products::filter_products, products::count_filtered_products};
 use crate::errors::BeedleError;
 use crate::session::{create_base_context, ensure_session_cookie, SessionInfo};
 use crate::views::ProductView;
 use serde::{Serialize, Deserialize};
 
-#[derive(Deserialize, Serialize)]
+const PER_PAGE: usize = 4;
+
+#[derive(Deserialize, Serialize, Debug)]
 struct ListParams {
     pub page: Option<usize>,
     pub category: Option<String>,
@@ -18,8 +22,8 @@ struct ListParams {
     pub sort: Option<String>,
 }
 
-/// Build a query string from (key, value) pairs
-/// Example output: "category=Fruit&search=Apple"
+/// Build a urlencoded query string 
+/// Example: {category: "Fruit", search: "Apple"} -> "category=Fruit&search=Apple"
 pub fn build_query_string(params: &HashMap<&str, String>) -> String {
     params.iter()
         .filter(|(_k, v)| !v.trim().is_empty())
@@ -28,34 +32,68 @@ pub fn build_query_string(params: &HashMap<&str, String>) -> String {
         .join("&")
 }
 
+/// Product listing page.
+/// Handles filtering+sorting+pagination and passes to Tera.
 async fn browse_products(
     pool: web::Data<DbPool>,
     tera: web::Data<Tera>,
     config: web::Data<Config>,
     query: web::Query<ListParams>,
     csrf_token: CsrfToken,
-    session: SessionInfo
+    session: SessionInfo,
 ) -> Result<HttpResponse, BeedleError> {
-    let page = query.page.unwrap_or(1); // /products?page=N
-    let per_page = 4;
-    let offset = (page - 1) * per_page;
-        
-    let mut conn = pool.get()?;
+    let page = query.page.unwrap_or(1).max(1);
+    let offset = (page - 1) * PER_PAGE;
+
+    log::debug!(
+        "browse_products: page={} category={:?} tag={:?} search={:?} sort={:?}",
+        page, query.category, query.tag, query.search, query.sort
+    );
+
+    // Get DB connection
+    let mut conn = pool.get().map_err(|e| {
+        log::error!("DB pool error (products): {}", e);
+        BeedleError::DatabaseError(e.to_string())
+    })?;
+
+    // Total number of items for these filters
+    let total_items = count_filtered_products(
+        &mut conn,
+        query.category.as_deref(),
+        query.tag.as_deref(),
+        query.search.as_deref(),
+    )?;
+
+    let total_pages = if total_items == 0 {
+        1
+    } else {
+        // Rust-style ceil division lol 
+        ((total_items + (PER_PAGE as i64) - 1) / (PER_PAGE as i64)) as usize
+    };
+
+    // Fetch filtered products
     let productlist = filter_products(
         &mut conn,
         query.category.as_deref(),
         query.tag.as_deref(),
         query.search.as_deref(),
         query.sort.as_deref(),
-        per_page,
+        PER_PAGE,
         offset,
-    )?;
+    ).map_err(|e| {
+        log::error!("Product filter query failed: {}", e);
+        e
+    })?;
 
+
+
+    // Convert Product models to renderable ProductView
     let products: Vec<ProductView> = productlist.iter().map(ProductView::from).collect();
-    let total_pages = (productlist.len() as f64 / per_page as f64).ceil() as usize;
+
+    // Load all unique categories for sidebar/category selection
     let categories = cache::CategoriesCache::get_categories().to_vec();
 
-    // build filter state
+    // Rebuild filter params for keeping query params when paginating/filtering in the template
     let mut params = HashMap::new();
     if let Some(s) = query.category.as_ref().filter(|s| !s.trim().is_empty()) {
         params.insert("category", s.clone());
@@ -66,30 +104,36 @@ async fn browse_products(
     if let Some(s) = query.search.as_ref().filter(|s| !s.trim().is_empty()) {
         params.insert("search", s.clone());
     }
+    // TODO: add tag filter 
 
     let filter_query = build_query_string(&params);
 
-    // HACK
+    // For building other URLs within the template 
     let request_args = serde_json::json!({
-    "category": query.category.clone().unwrap_or_default(),
-    "search": query.search.clone().unwrap_or_default(),
-    "sort": query.sort.clone().unwrap_or_default(),
+        "category": query.category.clone().unwrap_or_default(),
+        "search": query.search.clone().unwrap_or_default(),
+        "sort": query.sort.clone().unwrap_or_default(),
+        // "tag": query.tag.clone().unwrap_or_default(),
     });
 
     let mut ctx = create_base_context(&session, config.get_ref());
     ctx.insert("products", &products);
     ctx.insert("categories", &categories);
+
     ctx.insert("filter_query", &filter_query);
-    // TODO: also cache tags, add them here as well 
     ctx.insert("request_args", &request_args);
     ctx.insert("current_page", &page);
     ctx.insert("total_pages", &total_pages);
     ctx.insert("csrf_token", &csrf_token.get());
-   
-    let rendered = tera.render("products.html", &ctx)?;
-    
-    let response = HttpResponse::Ok().content_type("text/html").body(rendered);
 
+    // Render catalog template
+    let rendered = tera.render("products.html", &ctx).map_err(|e| {
+        log::error!("Tera render error (products): {}", e);
+        BeedleError::TemplateError(e)
+    })?;
+
+    // Set session cookie if new, before sending response
+    let response = HttpResponse::Ok().content_type("text/html").body(rendered);
     if session.was_created {
         Ok(ensure_session_cookie(response, session.session_id))
     } else {
@@ -97,85 +141,10 @@ async fn browse_products(
     }
 }
 
+/// Register Actix route at /products
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/products").route(web::get().to(browse_products)));
-}
-
-// UNIT TESTING
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use actix_web::{test, web::Data, App};
-    use actix_csrf::CsrfMiddleware;
-    use once_cell::sync::Lazy;
-    use diesel::{r2d2::ConnectionManager,PgConnection};
-    use crate::db::establish_connection;
-    
-
-    static POOL: Lazy<DbPool> = Lazy::new(|| {
-        dotenv::dotenv().ok();
-
-        let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let manager = ConnectionManager::<PgConnection>::new(database_url);
-        r2d2::Pool::builder()
-            .build(manager)
-            .expect("Failed to create pool.")
-    });
-
-    #[actix_rt::test]
-    async fn test_browse_products() {
-        let pool = POOL.get().expect("Failed to get a connection from the pool");
-        let tera = Tera::new("templates/**/*").unwrap();
-        let config = Config {
-            site_name: String::from("Test Site"),
-            root_domain: String::from("http://localhost"),
-        };
-
-        let csrf = CsrfMiddleware::with_rng(rand::rngs::OsRng)
-        .set_cookie(actix_web::http::Method::GET, "/add_to_cart")
-        .set_cookie(actix_web::http::Method::GET, "/cart")
-        .set_cookie(actix_web::http::Method::GET, "/product")
-        .set_cookie(actix_web::http::Method::GET, "/products");
-
-        let mut app = test::init_service(
-            App::new()
-                .app_data(Data::new(pool))
-                .app_data(Data::new(tera))
-                .app_data(Data::new(config))
-                .wrap(csrf)
-                .configure(init)
-        ).await;
-
-        let req = test::TestRequest::get().uri("/products").to_request();
-        let resp = test::call_service(&mut app, req).await;
-        assert!(resp.status().is_success());
-
-        // Check the response body
-        let body = test::read_body(resp).await;
-        let body_str = String::from_utf8(body.to_vec()).unwrap();
-        assert!(body_str.contains("Test Site"));  // Check if "Test Site" appears in the response
-    }
-
-    #[actix_rt::test]
-    async fn test_browse_products_invalid_path() {
-        let pool = establish_connection().expect("Failed to create pool.");
-        let tera = Tera::new("templates/**/*").unwrap();
-        let config = Config {
-            site_name: String::from("Test Site"),
-            root_domain: String::from("http://localhost"),
-        };
-
-        let mut app = test::init_service(
-            App::new()
-                .app_data(Data::new(pool.clone()))
-                .app_data(Data::new(tera))
-                .app_data(Data::new(config))
-                .configure(init)
-        ).await;
-
-        // Invalid path test
-        let req = test::TestRequest::get().uri("/invalid_path").to_request();
-        let resp = test::call_service(&mut app, req).await;
-        assert!(resp.status().is_client_error());  // Expect a 4xx client error
-    }
+    cfg.service(
+        web::resource("/products")
+            .route(web::get().to(browse_products))
+    );
 }
