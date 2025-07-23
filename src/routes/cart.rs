@@ -2,6 +2,7 @@ use actix_web::{web, HttpResponse, http::header};
 use actix_csrf::extractor::{Csrf, CsrfToken, CsrfGuarded};
 use tera::Tera;
 use serde::Serialize;
+use std::cmp::Ordering;
 use crate::config::Config;
 use crate::db::{DbPool, products};
 use crate::errors::BeedleError;
@@ -26,31 +27,43 @@ struct CartProductView {
     max_quantity: i32,
 }
 
-fn update_cart_quantity_for_sessioninfo(
+fn update_cart_quantity(
     cart: &mut Vec<CartItem>,
     product_id: i32,
     delta: i32,
     max_allowed: i32,
 ) {
-    if delta == 0 {
-        cart.retain(|item| item.product_id != product_id);
-    } else if delta > 0 {
-        let entry = cart.iter_mut().find(|item| item.product_id == product_id);
-        if let Some(item) = entry {
-            let new_qty = (item.quantity as i32 + delta).clamp(1, max_allowed);
-            item.quantity = new_qty as u32;
-        } else {
-            let start_qty = delta.clamp(1, max_allowed);
-            cart.push(CartItem { product_id, quantity: start_qty as u32 });
+    match delta.cmp(&0) {
+        Ordering::Equal => {
+            // Remove from cart if delta is zero
+            cart.retain(|item| item.product_id != product_id);
         }
-    } else {
-        if let Some(idx) = cart.iter().position(|item| item.product_id == product_id) {
-            let item = &mut cart[idx];
-            let new_qty = item.quantity as i32 + delta;
-            if new_qty < 1 {
-                cart.remove(idx);
-            } else {
-                item.quantity = new_qty as u32;
+        Ordering::Greater => {
+            // Increase quantity / insert item
+            match cart.iter_mut().find(|item| item.product_id == product_id) {
+                Some(item) => {
+                    let new_qty = (item.quantity as i32 + delta).clamp(1, max_allowed);
+                    item.quantity = new_qty as u32;
+                }
+                None => {
+                    let start_qty = delta.clamp(1, max_allowed);
+                    cart.push(CartItem {
+                        product_id,
+                        quantity: start_qty as u32,
+                    });
+                }
+            }
+        }
+        Ordering::Less => {
+            // Decrease quantity 
+            if let Some(idx) = cart.iter().position(|item| item.product_id == product_id) {
+                let item = &mut cart[idx];
+                let new_qty = item.quantity as i32 + delta; // (delta is negative)
+                if new_qty < 1 {
+                    cart.remove(idx); // remove item
+                } else {
+                    item.quantity = new_qty as u32;
+                }
             }
         }
     }
@@ -73,7 +86,7 @@ async fn update_cart_quantity_handler(
     let max_per_order = 99; // TODO: use product.max_per_order after I add that field 
     let max_allowed = product.inventory.min(max_per_order);
 
-    update_cart_quantity_for_sessioninfo(&mut session.cart, form.product_id, form.quantity, max_allowed);
+    update_cart_quantity(&mut session.cart, form.product_id, form.quantity, max_allowed);
 
     crate::db::session::update_session_cart(&mut conn, session.session_id, &session.cart)?;
 
@@ -97,7 +110,7 @@ async fn view_cart(
     let products = products::load_products(&mut conn)?;
 
     let cart_items: Vec<CartProductView> = cart
-        .into_iter()
+        .iter()
         .filter_map(|item| {
             products.iter()
                 .find(|p| p.id == item.product_id)
