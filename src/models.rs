@@ -3,7 +3,7 @@ use crate::schema::*;
 use serde::{Serialize, Deserialize};
 
 #[derive(Queryable, Debug, Clone, Serialize, Deserialize)]
-pub struct Product {
+pub(crate) struct Product {
     pub id: i32,
     pub name: String,
     pub price: bigdecimal::BigDecimal,
@@ -20,7 +20,7 @@ pub struct Product {
 
 #[derive(Insertable, Debug, Clone, Serialize, Deserialize)]
 #[diesel(table_name = product)]
-pub struct NewProduct {
+pub(crate) struct NewProduct {
     pub name: String,
     pub price: bigdecimal::BigDecimal,
     pub inventory: i32,
@@ -35,14 +35,14 @@ pub struct NewProduct {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CartItem {
+pub(crate) struct CartItem {
     pub product_id: i32,
     pub quantity: u32,
 }
 
 #[derive(Queryable, Insertable, AsChangeset)]
 #[diesel(table_name = session)]
-pub struct SessionRow {
+pub(crate) struct SessionRow {
     pub session_id: uuid::Uuid,
     pub user_id: Option<i32>,
     pub created_at: chrono::NaiveDateTime,
