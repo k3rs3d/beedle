@@ -41,6 +41,8 @@ let example_products = vec![
         tagline: Some("A crisp, tasty red apple!".to_owned()),
         description: Some("Only the freshest...".to_owned()),
         discount_percent: Some(10.0),
+        added_date: None,
+        restock_date: None
     },
     NewProduct {
         name: "Green Apple".to_owned(), 
@@ -54,6 +56,8 @@ let example_products = vec![
         tagline: Some("A crisp, tangy green apple!".to_owned()),
         description: Some("Only the luigiest...".to_owned()),
         discount_percent: None,
+        added_date: None,
+        restock_date: None
     },
     NewProduct {
         name: "Coffee".to_owned(), 
@@ -67,6 +71,8 @@ let example_products = vec![
         tagline: Some("Burnt roast from elsewhere!".to_owned()),
         description: Some("Only the coffeeiest...".to_owned()),
         discount_percent: None,
+        added_date: None,
+        restock_date: None
     },
     NewProduct {
         name: "Tea".to_owned(), 
@@ -80,6 +86,8 @@ let example_products = vec![
         tagline: Some("Bagged!".to_owned()),
         description: Some("Mostly unspilled!".to_owned()),
         discount_percent: Some(5.0),
+        added_date: None,
+        restock_date: None
     },
     NewProduct {
         name: "Malk".to_owned(), 
@@ -93,6 +101,8 @@ let example_products = vec![
         tagline: Some("Now with Vitamin R".to_owned()),
         description: Some("From the pastures of...".to_owned()),
         discount_percent: None,
+        added_date: None,
+        restock_date: None
     },
     NewProduct {
         name: "Kernberry Pie".to_owned(), 
@@ -106,6 +116,8 @@ let example_products = vec![
         tagline: Some("For eating!".to_owned()),
         description: Some("Loaded with the juiciest Kernberries...".to_owned()),
         discount_percent: None,
+        added_date: None,
+        restock_date: None
     },
     NewProduct {
         name: "Rust Cookie".to_owned(), 
@@ -119,6 +131,8 @@ let example_products = vec![
         tagline: Some("Disgusting!".to_owned()),
         description: Some("Some people like it.".to_owned()),
         discount_percent: Some(25.0),
+        added_date: None,
+        restock_date: None
     },
 ];
 

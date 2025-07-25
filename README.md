@@ -14,14 +14,13 @@ I found all existing e-commerce platforms to be inefficient, overly complicated,
 ## Limitations
 
 - **Early security:** Intended for shops where a human reviews every order. Not recommended for sensitive/high-value automated orders (like digital software) until further code review and feature hardening. Designed to be run behind a secure, rate-limited reverse proxy like nginx.
-- **No fancy cart gadgets or reporting out-of-the-box:** Feature set kept minimal by design!
-- **Operator must set up reverse proxy and payments:** Infrastructure is up to you.
+- **Infrastructure is up to you:** Operator must set up reverse proxy and payments.
 - **Not enterprise ready:** No distributed deployments, no support.
 
 ## Getting Started
 
 1. Install [Rust](https://rustup.rs/), [Postgres](https://www.postgresql.org/), and a reverse proxy (like Nginx) if you want SSL/rate limits.
-2. Set up the project: clone repo & compile the application with cargo. 
+2. Set up the project: clone repo & compile the application with `cargo build`. 
 3. Edit templates under `templates/` to control appearance and functionality.
 4. Add products directly in the DB for now. A GUI browser for postgres is currently recommended. Admin panel coming soon! 
 

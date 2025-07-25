@@ -14,6 +14,8 @@ diesel::table! {
         tagline -> Nullable<Text>,
         description -> Nullable<Text>,
         discount_percent -> Nullable<Float4>,
+        added_date -> Timestamp,
+        restock_date -> Nullable<Timestamp>,
     }
 }
 

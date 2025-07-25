@@ -21,6 +21,8 @@ pub struct ProductForm {
     pub tagline: Option<String>,
     pub description: Option<String>,
     pub discount_percent: Option<f32>,
+    pub date_added: Option<chrono::NaiveDateTime>,
+    pub date_restock_expected: Option<chrono::NaiveDateTime>
 }
 
 async fn list_products(
@@ -76,6 +78,8 @@ async fn add_product(
         tagline: form.tagline.clone(),
         description: form.description.clone(),
         discount_percent: form.discount_percent,
+        added_date: form.date_added,
+        restock_date: form.date_restock_expected
     };
 
     use crate::schema::product::dsl::*;

@@ -13,6 +13,8 @@ pub struct ProductView {
     pub discount_percent: Option<f32>,
     pub thumbnail_url: Option<String>,
     pub description: Option<String>,
+    pub date_added: Option<String>,
+    pub date_restock_expected: Option<String>,
 }
 
 impl From<&Product> for ProductView {
@@ -38,6 +40,9 @@ impl From<&Product> for ProductView {
             discount_percent: product.discount_percent,
             thumbnail_url: product.thumbnail_url.clone(),
             description: product.description.clone(),
+            // Format to RFC3339....could also just pass as raw chrono::NaiveDateTime
+            date_added: Some(product.added_date.format("%Y-%m-%d %H:%M:%S").to_string()),
+            date_restock_expected: product.restock_date.map(|d| d.format("%Y-%m-%d %H:%M:%S").to_string()),
         }
     }
 }

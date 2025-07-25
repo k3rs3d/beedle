@@ -16,6 +16,8 @@ pub(crate) struct Product {
     pub tagline: Option<String>,
     pub description: Option<String>,
     pub discount_percent: Option<f32>,
+    pub added_date: chrono::NaiveDateTime,
+    pub restock_date: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Insertable, Debug, Clone, Serialize, Deserialize)]
@@ -32,6 +34,8 @@ pub(crate) struct NewProduct {
     pub tagline: Option<String>,
     pub description: Option<String>,
     pub discount_percent: Option<f32>,
+    pub added_date: Option<chrono::NaiveDateTime>, 
+    pub restock_date: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

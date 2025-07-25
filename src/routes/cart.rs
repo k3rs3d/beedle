@@ -23,7 +23,7 @@ impl CsrfGuarded for CartActionForm {
 
 #[derive(Serialize)]
 struct CartProductView {
-    product: crate::views::ProductView,
+    product: ProductView,
     quantity: u32,
     max_quantity: i32,
 }
