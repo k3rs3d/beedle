@@ -8,6 +8,7 @@ use crate::db::{DbPool, products};
 use crate::errors::BeedleError;
 use crate::models::CartItem;
 use crate::session::{ensure_session_cookie, create_base_context, SessionInfo};
+use crate::views::ProductView;
 
 #[derive(serde::Deserialize)]
 struct CartActionForm {
@@ -22,7 +23,7 @@ impl CsrfGuarded for CartActionForm {
 
 #[derive(Serialize)]
 struct CartProductView {
-    product: crate::models::Product,
+    product: crate::views::ProductView,
     quantity: u32,
     max_quantity: i32,
 }
@@ -118,7 +119,7 @@ async fn view_cart(
                     let max_per_order = 99;
                     let max_quantity = p.inventory.min(max_per_order);
                     CartProductView {
-                        product: p.clone(),
+                        product: ProductView::from(p),
                         quantity: item.quantity,
                         max_quantity,
                     }
