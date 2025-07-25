@@ -60,10 +60,12 @@ pub fn filter_products(
 
     // Sorting
     query = match sort_opt {
-        Some("alpha") => query.order(name.asc()),
-        Some("price_low") => query.order(price.asc()),
-        Some("price_high") => query.order(price.desc()),
-        _ => query.order(price.asc()), // default sort, TODO: make default sort configurable?
+        Some("alpha")           => query.order(name.asc()),
+        Some("price_low")       => query.order(price.asc()),
+        Some("price_high")      => query.order(price.desc()),
+        Some("newest")          => query.order(added_date.desc()),
+        Some("oldest")          => query.order(added_date.asc()),
+        _=> query.order(added_date.desc()), // Default: newest
     };
 
     query

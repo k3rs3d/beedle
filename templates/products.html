@@ -21,6 +21,8 @@
         <select name="sort">
             <option value="">Newest</option>
             <option value="alpha" {% if request_args.sort=="alpha" %}selected{% endif %}>Alphabetical</option>
+            <option value="newest" {% if request_args.sort=="newest" %}selected{% endif %}>Date: Newest</option>
+            <option value="oldest" {% if request_args.sort=="oldest" %}selected{% endif %}>Date: Oldest</option>
             <option value="price_low" {% if request_args.sort=="price_low" %}selected{% endif %}>Price: Low to High</option>
             <option value="price_high" {% if request_args.sort=="price_high" %}selected{% endif %}>Price: High to Low</option>
         </select>
