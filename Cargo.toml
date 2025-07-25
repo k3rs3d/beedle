@@ -14,7 +14,7 @@ actix-session = { version = "0.9.0", features = ["cookie-session"] }
 actix-web = "4.8.0"
 async-std = "1.12.0"
 bigdecimal = { version = "0.4.8", features = ["serde"] }
-chrono = "0.4.38"
+chrono = { version = "0.4.38", features = ["serde"] }
 diesel = { version = "2.2.11", features = ["chrono", "numeric", "postgres", "r2d2", "serde_json", "uuid"] }
 dotenv = "0.15.0"
 env_logger = "0.11.3"
