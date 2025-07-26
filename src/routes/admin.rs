@@ -11,7 +11,7 @@ use tera::Tera;
 #[derive(Debug,Deserialize)]
 pub struct ProductForm {
     pub name: String,
-    pub price: bigdecimal::BigDecimal,
+    pub price: i64,
     pub inventory: i32,
     pub category: Option<String>,
     pub tags: Option<Vec<String>>,

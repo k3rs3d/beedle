@@ -97,6 +97,7 @@ impl Div<f64> for Price {
     }
 }
 
+
 impl Price {
     pub fn abs(self) -> Self {
         Price::from_cents(self.cents.abs())
@@ -104,13 +105,13 @@ impl Price {
 }
 
 impl fmt::Display for Price {
-    /// Ex: prints "$12.34"
+    /// prints eg "12.34"
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // minus for negatives
         if self.cents < 0 {
-            write!(f, "-${}", self.abs().to_decimal_string())
+            write!(f, "-{}", self.abs().to_decimal_string())
         } else {
-            write!(f, "${}", self.to_decimal_string())
+            write!(f, "{}", self.to_decimal_string())
         }
     }
 }

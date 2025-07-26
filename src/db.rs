@@ -1,7 +1,6 @@
 use crate::db::cache::initialize_caches;
 use crate::errors::BeedleError;
 use crate::models::{CartItem, Product, NewProduct};
-use bigdecimal::FromPrimitive;
 use r2d2::{Pool, PooledConnection};
 use diesel::{
     {ExpressionMethods,TextExpressionMethods,QueryDsl,RunQueryDsl},
@@ -31,7 +30,7 @@ pub fn seed_example_products(conn: &mut Conn) -> Result<(), BeedleError> {
 let example_products = vec![
     NewProduct {
         name: "Red Apple".to_owned(), 
-        price: bigdecimal::BigDecimal::from_f32(1.2).unwrap(),
+        price: 120,
         inventory: 100,
         category: "Produce".to_owned(),
         tags: Some("Fruit,Healthy".to_owned()),
@@ -46,7 +45,7 @@ let example_products = vec![
     },
     NewProduct {
         name: "Green Apple".to_owned(), 
-        price: bigdecimal::BigDecimal::from_f32(1.1).unwrap(),
+        price: 110,
         inventory: 130,
         category: "Produce".to_owned(),
         tags: Some("Fruit,Healthy".to_owned()),
@@ -61,7 +60,7 @@ let example_products = vec![
     },
     NewProduct {
         name: "Coffee".to_owned(), 
-        price: bigdecimal::BigDecimal::from_f32(7.2).unwrap(),
+        price: 720,
         inventory: 34,
         category: "Beverage".to_owned(),
         tags: Some("Caffeine".to_owned()),
@@ -76,7 +75,7 @@ let example_products = vec![
     },
     NewProduct {
         name: "Tea".to_owned(), 
-        price: bigdecimal::BigDecimal::from_f32(4.0).unwrap(),
+        price: 400,
         inventory: 50,
         category: "Beverage".to_owned(),
         tags: Some("Caffeine".to_owned()),
@@ -91,7 +90,7 @@ let example_products = vec![
     },
     NewProduct {
         name: "Malk".to_owned(), 
-        price: bigdecimal::BigDecimal::from_f32(1.1).unwrap(),
+        price: 110,
         inventory: 7,
         category: "Beverage".to_owned(),
         tags: Some("Dairy".to_owned()),
@@ -106,7 +105,7 @@ let example_products = vec![
     },
     NewProduct {
         name: "Kernberry Pie".to_owned(), 
-        price: bigdecimal::BigDecimal::from_f32(123.79).unwrap(),
+        price: 12399,
         inventory: 8,
         category: "Bakery".to_owned(),
         tags: Some("Pie".to_owned()),
@@ -121,7 +120,7 @@ let example_products = vec![
     },
     NewProduct {
         name: "Rust Cookie".to_owned(), 
-        price: bigdecimal::BigDecimal::from_f32(3.99).unwrap(),
+        price: 399,
         inventory: 50,
         category: "Bakery".to_owned(),
         tags: Some("Rust,Cookie".to_owned()),

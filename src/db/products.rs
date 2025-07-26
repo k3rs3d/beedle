@@ -127,7 +127,7 @@ pub fn save_product(conn: &mut Conn, product_in: &Product) -> Result<(), BeedleE
     let updated_rows = diesel::update(product.filter(id.eq(product_in.id)))
         .set((
             name.eq(&product_in.name),
-            price.eq(product_in.price.clone()),
+            price.eq(&product_in.price),
             inventory.eq(product_in.inventory),
             category.eq(&product_in.category),
             tags.eq(&product_in.tags),
