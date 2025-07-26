@@ -599,7 +599,6 @@ dependencies = [
  "actix-session",
  "actix-web",
  "async-std",
- "bigdecimal",
  "chrono",
  "diesel",
  "dotenv",
@@ -633,7 +632,6 @@ dependencies = [
  "num-bigint",
  "num-integer",
  "num-traits",
- "serde",
 ]
 
 [[package]]
