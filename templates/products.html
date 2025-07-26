@@ -58,16 +58,18 @@
             {% endif %}
         </p>
         <p>
-            <b>Price:</b>
-            {% if product.discount_percent and product.discount_percent > 0 %}
-            {% set discount = product.price * (1.0 - product.discount_percent / 100.0) %}
-            <span class="discounted">
-                <s>${{ product.price }}</s>
-                ${{ discount | round(precision=2) }}
-                <span class="discount-label">-{{ product.discount_percent | round(precision=2) }}%!</span>
-            </span>
+            {% if product.is_on_sale %}
+                <span class="discounted">
+                    <s>${{ product.price_original_formatted }}</s>
+                    ${{ product.price_discounted_formatted }}
+                    {% if product.discount_percent %}
+                        <span class="discount-label">
+                            -{{ product.discount_percent | round(precision=2) }}%
+                        </span>
+                    {% endif %}
+                </span>
             {% else %}
-                ${{ product.price }}
+                ${{ product.price_original_formatted }}
             {% endif %}
         </p>
         {% if product.gallery_urls | length > 0 %}
