@@ -39,7 +39,7 @@
 <ul class="product-list">
     {% for product in products %}
     <li class="product-card">
-        <a href="/products/{{ product.product_id }}">
+        <a href="/products/{{ product.id }}">
             <h3>{{ product.name }}</h3>
         </a>
         {% if product.tagline %}
@@ -81,7 +81,7 @@
         {% endif %}
         <form action="/update_cart_quantity/" method="post" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="hidden" name="product_id" value="{{ product.product_id }}">
+            <input type="hidden" name="product_id" value="{{ product.id }}">
             <input type="hidden" name="quantity" value="1">
             <button type="submit">Add to Cart</button>
         </form>
