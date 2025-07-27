@@ -13,10 +13,10 @@ use crate::db::{DbPool, session::*};
 pub struct SessionInfo {
     pub session_id: Uuid,
     pub was_created: bool,
-    pub user_id: Option<i32>, // TODO: user accounts
+    pub _user_id: Option<i32>, // TODO: user accounts
     pub cart: Vec<CartItem>,
-    pub ip_address: String, 
-    pub user_agent: String,
+    pub _ip_address: String, 
+    pub _user_agent: String,
 }
 
 impl actix_web::FromRequest for SessionInfo {
@@ -87,10 +87,10 @@ impl actix_web::FromRequest for SessionInfo {
             Ok(SessionInfo {
                 session_id,
                 was_created,
-                user_id: row.user_id,
+                _user_id: row.user_id,
                 cart,
-                ip_address: ip,
-                user_agent,
+                _ip_address: ip,
+                _user_agent: user_agent,
             })
         }
         .boxed()
@@ -135,53 +135,4 @@ pub fn get_cart(session: &Session) -> Vec<CartItem> {
         Ok(Some(cart)) => cart,
         _ => Vec::new(),
     }
-}
-
-
-// UNIT TESTING 
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use actix_session::SessionExt;
-    use actix_web::test;
-
-    // need database connection
-    /*
-    #[actix_rt::test]
-    async fn test_add_to_cart() {
-        let session = test::TestRequest::default().to_http_request();
-        let session = session.get_session();
-        let cart = get_cart(&session);
-        assert_eq!(cart.len(), 0);
-        update_cart_quantity(&session, 1, 1);
-        let cart: Vec<CartItem> = get_cart(&session);
-        assert_eq!(cart.len(), 1);
-        assert_eq!(cart[0].product_id, 1);
-        assert_eq!(cart[0].quantity, 1);
-    }
-
-    #[actix_rt::test]
-    async fn test_remove_from_cart() {
-        let session = test::TestRequest::default().to_http_request();
-        let session = session.get_session();
-        update_cart_quantity(&session, 1, 1);
-        update_cart_quantity(&session, 2, 1);
-        let cart = get_cart(&session);
-        assert_eq!(cart.len(), 2);
-        update_cart_quantity(&session, 1, -1);
-        let cart = get_cart(&session);
-        assert_eq!(cart.len(), 1);
-        assert_eq!(cart[0].product_id, 2);
-    }
-
-    // Cart must be empty in a new session 
-    #[actix_rt::test]
-    async fn test_empty_cart_state() {
-        let session = test::TestRequest::default().to_http_request();
-        let session = session.get_session();
-        let cart = get_cart(&session);
-        assert!(cart.is_empty());
-    }
-    */
 }

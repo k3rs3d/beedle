@@ -1,12 +1,11 @@
 use crate::db::cache::initialize_caches;
 use crate::errors::BeedleError;
-use crate::models::{CartItem, Product, NewProduct};
+use crate::models::{NewProduct};
 use r2d2::{Pool, PooledConnection};
 use diesel::{
-    {ExpressionMethods,TextExpressionMethods,QueryDsl,RunQueryDsl},
+    {QueryDsl,RunQueryDsl},
     r2d2::{self, ConnectionManager},
     pg::PgConnection,
-    prelude::*
 };
 pub type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type Conn = PooledConnection<ConnectionManager<PgConnection>>;

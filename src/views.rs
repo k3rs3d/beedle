@@ -1,7 +1,6 @@
 use serde::Serialize;
 use crate::models::Product;
 use crate::price::Price;
-use crate::schema::product::price;
 
 #[derive(Serialize)]
 pub struct ProductView {
