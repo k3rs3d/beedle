@@ -6,21 +6,21 @@
     <p>Your cart is empty</p>
 {% else %}
 
-{% if undo_id %}
-    <div class="undo-message">
-        {% if undo_product_name %}
-            Removed <b>{{ undo_product_name }}</b> from your cart.
-        {% else %}
-            Removed item ID {{ undo_id }}.
-        {% endif %}
-        <form action="/update_cart_quantity/" method="post" style="display:inline">
-            <input type="hidden" name="product_id" value="{{ undo_id }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="hidden" name="quantity" value="{{ undo_qty }}">
-            <button type="submit" class="undo-btn">Undo</button>
-        </form>
-    </div>
-{% endif %}
+    {% if undo_id %}
+        <div class="undo-message">
+            <form action="/update_cart_quantity/" method="post" style="display:inline">
+                <input type="hidden" name="product_id" value="{{ undo_id }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="quantity" value="{{ undo_qty }}">
+                <button type="submit" class="undo-btn">Undo</button>
+            </form>
+            {% if undo_product_name %}
+                Removed <b>{{ undo_product_name }}</b> from your cart.
+            {% else %}
+                Removed item ID {{ undo_id }}.
+            {% endif %}
+        </div>
+    {% endif %}
 
     <ul>
     {% for item in cart_items %}
