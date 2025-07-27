@@ -4,7 +4,7 @@ use crate::price::Price;
 
 #[derive(Serialize)]
 pub struct ProductView {
-    pub product_id: i32,
+    pub id: i32,
     pub name: String,
     pub price_original: Price,
     pub price_discounted: Price,
@@ -39,7 +39,7 @@ impl From<&Product> for ProductView {
         };
 
         ProductView {
-            product_id: product.id,
+            id: product.id,
             name: product.name.clone(),
             price_original,
             price_discounted,
