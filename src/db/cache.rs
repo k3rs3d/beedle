@@ -46,7 +46,7 @@ impl CategoriesCache {
 #[cfg(test)]
 mod cache_tests {
     use super::*;
-    use crate::db::{Conn, DbPool, establish_connection, init_db, seed_example_products};
+    use crate::db::{Conn, DbPool, establish_connection, init_db};
     use diesel::{PgConnection, r2d2::ConnectionManager};
     use once_cell::sync::Lazy;
     use std::env;
@@ -70,7 +70,8 @@ mod cache_tests {
         let mut conn = get_test_conn();
 
         init_db(&mut conn).expect("Failed to initialize DB");
-        seed_example_products(&mut conn).expect("Failed to seed DB with test data");
+        //seed_example_products(&mut conn).expect("Failed to seed DB with test data");
+        // removed this function; now depends on db to be pre seeded with test data
         initialize_caches(&mut conn).expect("Failed to cache from DB");
 
         // Ensure cache is initialized with correct data
@@ -84,7 +85,8 @@ mod cache_tests {
         let mut conn = get_test_conn();
 
         init_db(&mut conn).expect("Failed to initialize DB");
-        seed_example_products(&mut conn).expect("Failed to seed DB with test data");
+        //seed_example_products(&mut conn).expect("Failed to seed DB with test data");
+        // removed this function; now depends on db to be pre seeded with test data
         initialize_caches(&mut conn).expect("Failed to cache from DB");
 
         CategoriesCache::invalidate();

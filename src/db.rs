@@ -14,135 +14,6 @@ pub mod cache;
 pub mod products;
 pub mod session;
 
-// DEBUG
-// Add fake example products to db
-pub fn seed_example_products(conn: &mut Conn) -> Result<(), BeedleError> {
-    use crate::schema::product::dsl::*;
-    let existing: i64 = product.count().get_result(conn)
-        .map_err(|e| BeedleError::DatabaseError(e.to_string()))?;
-    if existing > 0 {
-        log::info!("Products already exist, skipping seed.");
-        return Ok(());
-    }
-    //let now = chrono::Utc::now().naive_utc();
-
-let example_products = vec![
-    NewProduct {
-        name: "Red Apple".to_owned(), 
-        price: 120,
-        inventory: 100,
-        category: "Produce".to_owned(),
-        tags: Some("Fruit,Healthy".to_owned()),
-        keywords: Some("apple,malus".to_owned()),
-        thumbnail_url: Some("https://en.wikipedia.org/static/images/icons/wikipedia.png".to_owned()),
-        gallery_urls: Some("https://commons.wikimedia.org/wiki/File:Box_of_Marbles.jpg".to_owned()),
-        tagline: Some("A crisp, tasty red apple!".to_owned()),
-        description: Some("Only the freshest...".to_owned()),
-        discount_percent: Some(10.0),
-        added_date: None,
-        restock_date: None
-    },
-    NewProduct {
-        name: "Green Apple".to_owned(), 
-        price: 110,
-        inventory: 130,
-        category: "Produce".to_owned(),
-        tags: Some("Fruit,Healthy".to_owned()),
-        keywords: Some("red,apple,malus".to_owned()),
-        thumbnail_url: Some("https://en.wikipedia.org/static/images/icons/wikipedia.png".to_owned()),
-        gallery_urls: Some("https://commons.wikimedia.org/wiki/File:Box_of_Marbles.jpg".to_owned()),
-        tagline: Some("A crisp, tangy green apple!".to_owned()),
-        description: Some("Only the luigiest...".to_owned()),
-        discount_percent: None,
-        added_date: None,
-        restock_date: None
-    },
-    NewProduct {
-        name: "Coffee".to_owned(), 
-        price: 720,
-        inventory: 34,
-        category: "Beverage".to_owned(),
-        tags: Some("Caffeine".to_owned()),
-        keywords: Some("brewed,hot".to_owned()),
-        thumbnail_url: Some("https://en.wikipedia.org/static/images/icons/wikipedia.png".to_owned()),
-        gallery_urls: Some("https://commons.wikimedia.org/wiki/File:Box_of_Marbles.jpg".to_owned()),
-        tagline: Some("Burnt roast from elsewhere!".to_owned()),
-        description: Some("Only the coffeeiest...".to_owned()),
-        discount_percent: None,
-        added_date: None,
-        restock_date: None
-    },
-    NewProduct {
-        name: "Tea".to_owned(), 
-        price: 400,
-        inventory: 50,
-        category: "Beverage".to_owned(),
-        tags: Some("Caffeine".to_owned()),
-        keywords: Some("brewed,cold".to_owned()),
-        thumbnail_url: Some("https://en.wikipedia.org/static/images/icons/wikipedia.png".to_owned()),
-        gallery_urls: Some("https://commons.wikimedia.org/wiki/File:Box_of_Marbles.jpg".to_owned()),
-        tagline: Some("Bagged!".to_owned()),
-        description: Some("Mostly unspilled!".to_owned()),
-        discount_percent: Some(5.0),
-        added_date: None,
-        restock_date: None
-    },
-    NewProduct {
-        name: "Malk".to_owned(), 
-        price: 110,
-        inventory: 7,
-        category: "Beverage".to_owned(),
-        tags: Some("Dairy".to_owned()),
-        keywords: Some("cold".to_owned()),
-        thumbnail_url: Some("https://en.wikipedia.org/static/images/icons/wikipedia.png".to_owned()),
-        gallery_urls: Some("https://commons.wikimedia.org/wiki/File:Box_of_Marbles.jpg".to_owned()),
-        tagline: Some("Now with Vitamin R".to_owned()),
-        description: Some("From the pastures of...".to_owned()),
-        discount_percent: None,
-        added_date: None,
-        restock_date: None
-    },
-    NewProduct {
-        name: "Kernberry Pie".to_owned(), 
-        price: 12399,
-        inventory: 8,
-        category: "Bakery".to_owned(),
-        tags: Some("Pie".to_owned()),
-        keywords: Some("kern,berry".to_owned()),
-        thumbnail_url: Some("https://en.wikipedia.org/static/images/icons/wikipedia.png".to_owned()),
-        gallery_urls: Some("https://commons.wikimedia.org/wiki/File:Box_of_Marbles.jpg".to_owned()),
-        tagline: Some("For eating!".to_owned()),
-        description: Some("Loaded with the juiciest Kernberries...".to_owned()),
-        discount_percent: None,
-        added_date: None,
-        restock_date: None
-    },
-    NewProduct {
-        name: "Rust Cookie".to_owned(), 
-        price: 399,
-        inventory: 50,
-        category: "Bakery".to_owned(),
-        tags: Some("Rust,Cookie".to_owned()),
-        keywords: Some("rusty".to_owned()),
-        thumbnail_url: Some("https://en.wikipedia.org/static/images/icons/wikipedia.png".to_owned()),
-        gallery_urls: Some("https://commons.wikimedia.org/wiki/File:Box_of_Marbles.jpg".to_owned()),
-        tagline: Some("Disgusting!".to_owned()),
-        description: Some("Some people like it.".to_owned()),
-        discount_percent: Some(25.0),
-        added_date: None,
-        restock_date: None
-    },
-];
-
-for p in example_products {
-    products::insert_product(conn, &p)?;
-}
-    log::info!("Seeded example products.");
-    Ok(())
-}
-
-
-
 pub fn establish_connection() -> Result<DbPool, BeedleError> {
     let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set!");
     let manager = ConnectionManager::<PgConnection>::new(&db_url);
@@ -150,7 +21,7 @@ pub fn establish_connection() -> Result<DbPool, BeedleError> {
 }
 
 pub fn init_db(conn: &mut Conn) -> Result<(), BeedleError> {
-    seed_example_products(conn)?;
+    //seed_example_products(conn)?; // Moved to a db migration instead
     initialize_caches(conn)?;
     Ok(())
 }
