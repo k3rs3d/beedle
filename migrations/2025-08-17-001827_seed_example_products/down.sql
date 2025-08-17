@@ -1,0 +1,2 @@
+-- Remove ONLY the example products (make it as specific as you wish, or just clear the table)
+DELETE FROM product WHERE name IN ('Red Apple','Green Apple','Blue Apple','Grape','Kernberries','Coffee','Tea','Pink Drink','Green Drink','Malk','Kernberry Pie','Bumble Pie','Rust Cookie');

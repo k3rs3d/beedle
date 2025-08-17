@@ -1,3 +1,0 @@
-ALTER TABLE product
-    ADD COLUMN added_date TIMESTAMP NOT NULL DEFAULT now(),
-    ADD COLUMN restock_date TIMESTAMP NULL;

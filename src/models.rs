@@ -6,6 +6,7 @@ use serde::{Serialize, Deserialize};
 pub(crate) struct Product {
     pub id: i32,
     pub name: String,
+    pub price: i64,
     pub inventory: i32,
     pub category: String,
     pub tags: Option<String>,
@@ -17,7 +18,6 @@ pub(crate) struct Product {
     pub discount_percent: Option<f32>,
     pub added_date: chrono::NaiveDateTime,
     pub restock_date: Option<chrono::NaiveDateTime>,
-    pub price: i64,
 }
 
 #[derive(Insertable, Debug, Clone, Serialize, Deserialize)]

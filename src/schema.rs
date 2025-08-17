@@ -4,6 +4,7 @@ diesel::table! {
     product (id) {
         id -> Int4,
         name -> Text,
+        price -> Int8,
         inventory -> Int4,
         category -> Text,
         tags -> Nullable<Text>,
@@ -15,7 +16,6 @@ diesel::table! {
         discount_percent -> Nullable<Float4>,
         added_date -> Timestamp,
         restock_date -> Nullable<Timestamp>,
-        price -> Int8,
     }
 }
 
